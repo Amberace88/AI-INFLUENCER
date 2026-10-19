@@ -63,7 +63,7 @@ function Row({ u, plans, isMe, onChange }: { u: AdminUser; plans: { id: string; 
     <tr className="border-b border-line/70 align-middle last:border-0">
       <td className="px-4 py-3">
         <span className="font-semibold">{u.email}</span>
-        {isMe && <span className="ml-2 rounded bg-ink px-1.5 py-0.5 text-[10px] font-semibold text-[#e6c86e]">YOU · ADMIN</span>}
+        {isMe && <span className="ml-2 rounded bg-ink px-1.5 py-0.5 text-[11px] font-semibold text-safelight">You, admin</span>}
         <div className="text-xs text-muted">since {new Date(u.created_at).toLocaleDateString("en-GB")}</div>
       </td>
       <td className="px-4 py-3">

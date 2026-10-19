@@ -5,7 +5,7 @@ import { signIn, type AuthState } from "./actions";
 
 const MODES = [
   { id: "signin", label: "Sign in", button: "Sign in" },
-  { id: "signup", label: "Create account", button: "Create account" },
+  { id: "signup", label: "New account", button: "Create account" },
   { id: "magic", label: "Email link", button: "Send sign-in link" },
 ] as const;
 
@@ -28,7 +28,7 @@ export function LoginForm({ initialMode, next, linkError }: { initialMode: "sign
             role="tab"
             aria-selected={mode === m.id}
             onClick={() => setMode(m.id)}
-            className={`flex-1 rounded-full px-3 py-1.5 font-semibold ${mode === m.id ? "bg-ink text-paper" : "text-muted hover:text-ink"}`}
+            className={`flex-1 whitespace-nowrap rounded-full px-3 py-1.5 font-semibold ${mode === m.id ? "bg-ink text-paper" : "text-muted hover:text-ink"}`}
           >
             {m.label}
           </button>

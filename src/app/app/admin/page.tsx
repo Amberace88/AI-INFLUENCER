@@ -70,7 +70,7 @@ export default async function AdminPage() {
           {(plans ?? []).map((p) => (
             <li key={p.id} className="rounded-xl bg-paper px-4 py-3 ring-1 ring-line">
               <span className="font-semibold">{p.name}</span>
-              <span className="ml-2 tabular-nums text-muted">{o.by_plan?.[p.id] ?? 0} users</span>
+              <span className="ml-2 tabular-nums text-muted">{o.by_plan?.[p.id] ?? 0} user{(o.by_plan?.[p.id] ?? 0) === 1 ? "" : "s"}</span>
               <p className="text-xs text-muted">€{Number(p.price_eur_incl_vat).toFixed(2)} · {p.max_personas} personas · {p.monthly_credits} cr/mo</p>
             </li>
           ))}
