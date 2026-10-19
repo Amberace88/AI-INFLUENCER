@@ -1,0 +1,30 @@
+{
+  "_comment": "fal.ai model presets. Placeholders as in ComfyUI workflows plus {{reference_url}}. usd_per_megapixel is used to estimate cost per job; null = unknown, check fal.ai pricing page. Verify model IDs and inputs on fal.ai before relying on them.",
+  "fal_flux_dev": {
+    "model": "fal-ai/flux/dev",
+    "needs_reference": false,
+    "usd_per_megapixel": null,
+    "input": {
+      "prompt": "{{prompt}}",
+      "image_size": { "width": "{{width}}", "height": "{{height}}" },
+      "num_inference_steps": "{{steps}}",
+      "guidance_scale": "{{cfg}}",
+      "seed": "{{seed}}",
+      "num_images": 1
+    }
+  },
+  "fal_instant_character": {
+    "model": "fal-ai/instant-character",
+    "needs_reference": true,
+    "usd_per_megapixel": 0.1,
+    "input": {
+      "prompt": "{{prompt}}",
+      "negative_prompt": "{{negative}}",
+      "image_url": "{{reference_url}}",
+      "image_size": { "width": "{{width}}", "height": "{{height}}" },
+      "num_inference_steps": "{{steps}}",
+      "guidance_scale": "{{cfg}}",
+      "seed": "{{seed}}"
+    }
+  }
+}
