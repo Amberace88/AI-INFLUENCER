@@ -6,7 +6,7 @@ import { BENCHMARK_SCENES } from "@/lib/benchmark";
 import { runBenchmark } from "../../actions";
 
 export function BenchmarkLauncher({ personaId }: { personaId: string }) {
-  const [wf, setWf] = useState(WORKFLOWS[0].id);
+  const [wf, setWf] = useState("cf_klein_text");
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 

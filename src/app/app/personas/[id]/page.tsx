@@ -67,6 +67,12 @@ export default async function PersonaPage({ params, searchParams }: { params: Pr
           {persona.tagline ? `. ${persona.tagline}` : ""}
         </p>
         <PersonaTabs id={id} />
+        {sp.created === "twin" && (
+          <p role="status" className="mt-4 rounded-lg bg-paper p-3 text-sm ring-1 ring-ok/40">
+            Your digital twin is ready. Open the Studio and choose &ldquo;Same face, new scene&rdquo;: every shot uses your photos as the face reference.
+          </p>
+        )}
+        {persona.likeness === "self" && <p className="mt-2 inline-block rounded bg-ink px-2 py-0.5 text-xs font-semibold text-[#e6c86e]">Digital twin of you · consent on file</p>}
         {sp.created === "ai" && (
           <p role="status" className="mt-4 rounded-lg bg-paper p-3 text-sm ring-1 ring-ok/40">
             {persona.name} is ready. Read the profile below and change anything that does not fit, then add a reference photo or shoot a first portrait.

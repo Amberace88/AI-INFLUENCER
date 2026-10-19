@@ -4,9 +4,9 @@ import Link from "next/link";
 import { useState } from "react";
 
 const PLANS = [
-  { id: "free", name: "Free", monthly: 0, personas: 1, credits: "30 to start", note: "Try one persona", features: ["AI persona passport", "Fast cloud drafts", "Posts in the persona's voice"] },
-  { id: "starter", name: "Starter", monthly: 29.99, personas: 1, credits: "400 / month", note: "One face for your brand", features: ["Everything in Free", "Reference-photo workflows", "Consistency scoring"] },
-  { id: "pro", name: "Pro", monthly: 69.99, personas: 5, credits: "1,200 / month", note: "Several brands or channels", features: ["Everything in Starter", "Benchmark runs", "Priority queue"], featured: true },
+  { id: "free", name: "Free", monthly: 0, personas: 1, credits: "30 to start", note: "Try one persona", features: ["AI persona passport", "Natural photos and quick sketches", "Posts in the persona's voice"] },
+  { id: "starter", name: "Starter", monthly: 29.99, personas: 1, credits: "400 / month", note: "One face for your brand", features: ["Everything in Free", "Same face in every scene", "A digital twin of yourself"] },
+  { id: "pro", name: "Pro", monthly: 69.99, personas: 5, credits: "1,200 / month", note: "Several brands or channels", features: ["Everything in Starter", "Consistency benchmarks", "Priority queue"], featured: true },
   { id: "business", name: "Business", monthly: 109.99, personas: 10, credits: "1,800 / month", note: "Agencies and teams", features: ["Everything in Pro", "Video when it launches", "Invoice billing"] },
 ];
 
@@ -59,7 +59,7 @@ export function Pricing() {
         })}
       </ul>
       <p className="mt-6 max-w-2xl text-sm text-muted">
-        1 credit is one fast draft; HD images with a reference photo cost 3, AI texts 2. Need more in a busy month? Add a credit pack, or wait for next month&apos;s refill.
+        1 credit is one quick sketch; natural photos and same-face photos cost 2, AI texts 2. Need more in a busy month? Add a credit pack, or wait for next month&apos;s refill.
       </p>
     </div>
   );

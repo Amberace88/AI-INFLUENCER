@@ -62,6 +62,9 @@ Lai redzētu visu lietotāju darbus un iegūtu Business limitus testēšanai, SQ
 
 | ID | Kur | Ko dara | Godīgs ierobežojums |
 |---|---|---|---|
+| `cf_klein_ref` | Cloudflare | **Tā pati seja jaunā ainā**: FLUX.2 klein ar līdz 4 atsauces bildēm | ~$0,016 par bildi, 2 kredīti |
+| `cf_klein_text` | Cloudflare | Dabisks foto no apraksta (FLUX.2) | ~$0,015, 2 kredīti |
+| `cf_flux_schnell` | Cloudflare | Ātrā skice (FLUX.1 schnell) | tikai kvadrāts, mazāk dabisks; ~$0,0006 |
 | `txt2img_basic` | ComfyUI | Teksts → attēls ar jebkuru SD1.5/SDXL modeli | Seja tiek noturēta tikai ar aprakstu. Konsekvence vāja. |
 | `img2img_reference` | ComfyUI | Sāk no personas galvenās foto | Notur kompozīciju un krāsas, **ne** uzticamu sejas līdzību |
 | `fal_flux_dev` | fal.ai | FLUX dev teksts → attēls | Maksas; cenu pārbaudi fal.ai |
@@ -82,6 +85,13 @@ Piemēram, IP-Adapter/PuLID workflow ar `{{reference_image}}` dod daudz labāku 
 
 Personāžu limitu nodrošina datubāzes trigeris. Kredītus noņem `enqueue_job` (attēli) un `spend_credits` (AI teksti), un tehniskas kļūdas gadījumā tos atgriež.
 Papildu pakas ir tabulā `credit_packs`. Stripe maksājumi un mēneša kredītu atjaunošana būs nākamajā solī.
+
+## Digitālais dvīnis
+Personas → New → **Make one of me**: klients augšupielādē 1–4 savas bildes un apstiprina trīs punktus (bildes ir viņa, ir 18+, marķēs saturu kā AI).
+Piekrišana tiek saglabāta tabulā `likeness_consents`. Dvīnis ir pieejams tikai maksas plāniem (`plans.allow_twin`), viens katram kontam (DB trigeris).
+
+## Reālisma slānis
+Katram foto promptam automātiski pievieno `REALISM` un `REALISM_AVOID` (`src/lib/catalog.ts`). Studio → Advanced to var izslēgt.
 
 ## Kredīti un cenas
 Cenas un kredīti dzīvo datubāzē, ne kodā: tabulas `generation_costs`, `plans`, `app_settings` (`signup_bonus_credits`).

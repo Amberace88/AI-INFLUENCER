@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { SCORE_CRITERIA, workflowById } from "@/lib/catalog";
-import { reviewAsset } from "../actions";
+import { reviewAsset, setAssetAsReference } from "../actions";
 
 export type SheetAsset = {
   id: string;
@@ -76,6 +76,7 @@ function Review({ asset, frameNo, onClose, onPrev, onNext, onChange, personaName
   const [notes, setNotes] = useState(asset.notes ?? "");
   const [pending, start] = useTransition();
   const [err, setErr] = useState("");
+  const [refMsg, setRefMsg] = useState("");
 
   useEffect(() => { ref.current?.showModal(); }, []);
   useEffect(() => {
@@ -160,6 +161,18 @@ function Review({ asset, frameNo, onClose, onPrev, onNext, onChange, personaName
             <button className="btn btn-primary" disabled={pending} onClick={() => save()}>Save scores</button>
             <a href={asset.url} download target="_blank" rel="noreferrer" className="btn btn-ghost">Download</a>
           </div>
+          {asset.persona_id && (
+            <button className="btn btn-ghost mt-3 w-full" disabled={pending}
+              onClick={() => start(async () => {
+                const r = await setAssetAsReference(asset.id);
+                if (r.ok) onChange({ review_status: "accepted" });
+                setErr(r.ok ? "" : r.error);
+                setRefMsg(r.ok ? r.message ?? "Saved" : "");
+              })}>
+              Use as {personaName ?? "persona"}&apos;s face reference
+            </button>
+          )}
+          {refMsg && <p className="mt-2 text-sm text-ok">{refMsg}</p>}
           {err && <p className="mt-2 text-sm text-bad">{err}</p>}
 
           <dl className="mt-6 grid grid-cols-2 gap-x-4 gap-y-1 border-t border-line pt-4 text-xs">

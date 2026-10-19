@@ -3,22 +3,48 @@
 export type Workflow = {
   id: string;
   provider: "comfyui" | "fal" | "cloudflare";
-  kind: "image_sd" | "image_hd" | "image_fast";
+  kind: "image_sd" | "image_hd" | "image_fast" | "image_ref";
   label: string;
   hint: string;
   needsReference: boolean;
+  /** main choices shown first; the rest sit under "More engines" */
+  primary: boolean;
+  /** output is always square, size options don't apply */
+  squareOnly?: boolean;
   defaults: { width: number; height: number; steps: number; cfg: number };
 };
 
 export const WORKFLOWS: Workflow[] = [
   {
+    id: "cf_klein_ref",
+    provider: "cloudflare",
+    kind: "image_ref",
+    label: "Same face, new scene",
+    hint: "FLUX.2 uses the persona's reference photos to keep the face. Best for publishing.",
+    needsReference: true,
+    primary: true,
+    defaults: { width: 832, height: 1248, steps: 4, cfg: 0 },
+  },
+  {
+    id: "cf_klein_text",
+    provider: "cloudflare",
+    kind: "image_ref",
+    label: "Photo from description",
+    hint: "FLUX.2, natural photo look. Use it for a first portrait, then make the best one the reference.",
+    needsReference: false,
+    primary: true,
+    defaults: { width: 832, height: 1248, steps: 4, cfg: 0 },
+  },
+  {
     id: "cf_flux_schnell",
     provider: "cloudflare",
     kind: "image_fast",
-    label: "Cloud · fast draft (FLUX schnell)",
-    hint: "Cloudflare Workers AI. Seconds per image, ~150 free a day. Square 1024 px only; identity from the description, no fixed seed.",
+    label: "Quick sketch",
+    hint: "FLUX.1 schnell. Seconds and nearly free, but less natural. Good for trying ideas.",
     needsReference: false,
-    defaults: { width: 1024, height: 1024, steps: 4, cfg: 0 },
+    primary: true,
+    squareOnly: true,
+    defaults: { width: 1024, height: 1024, steps: 8, cfg: 0 },
   },
   {
     id: "txt2img_basic",
@@ -27,6 +53,7 @@ export const WORKFLOWS: Workflow[] = [
     label: "Local · text to image",
     hint: "Runs in ComfyUI on your Mac. Identity comes only from the persona description.",
     needsReference: false,
+    primary: false,
     defaults: { width: 512, height: 768, steps: 25, cfg: 6.5 },
   },
   {
@@ -36,27 +63,37 @@ export const WORKFLOWS: Workflow[] = [
     label: "Local · from reference photo",
     hint: "Starts from the persona's main reference. Keeps composition and colours, not a reliable face match.",
     needsReference: true,
+    primary: false,
     defaults: { width: 512, height: 768, steps: 25, cfg: 6.5 },
   },
   {
     id: "fal_flux_dev",
     provider: "fal",
     kind: "image_hd",
-    label: "Cloud · FLUX text to image",
-    hint: "fal.ai, paid per image. Higher quality, no reference.",
+    label: "fal.ai · FLUX dev",
+    hint: "fal.ai, paid per image. Needs FAL_KEY on the worker.",
     needsReference: false,
+    primary: false,
     defaults: { width: 768, height: 1152, steps: 28, cfg: 3.5 },
   },
   {
     id: "fal_instant_character",
     provider: "fal",
     kind: "image_hd",
-    label: "Cloud · keep face from reference",
-    hint: "fal.ai Instant Character. Uses the persona's main reference to hold the identity. ~$0.10 per megapixel.",
+    label: "fal.ai · Instant Character",
+    hint: "fal.ai, keeps the face from one reference. ~$0.10 per megapixel. Needs FAL_KEY.",
     needsReference: true,
+    primary: false,
     defaults: { width: 768, height: 1152, steps: 28, cfg: 3.5 },
   },
 ];
+
+/** Added to every photo prompt so results look like real photos, not stock or CGI. */
+export const REALISM =
+  "candid natural photograph, relaxed genuine expression, believable everyday pose, hands relaxed at the sides or out of frame, " +
+  "real skin texture with visible pores, natural soft light, shot on a full-frame camera with a 35mm lens, shallow depth of field, subtle film grain";
+export const REALISM_AVOID =
+  "plastic or airbrushed skin, waxy face, exaggerated grin, stock-photo pose, hands raised in front of the body, extra fingers, CGI, 3D render, cartoon, oversaturated, HDR, watermark, text";
 
 export const SIZES = [
   { id: "portrait", label: "Portrait 2:3", w: 2, h: 3 },
@@ -125,6 +162,7 @@ export type Persona = {
   donts: string | null;
   locations: string | null;
   brand_name: string | null;
+  likeness?: "fictional" | "self" | "consented";
   appearance: Record<string, string>;
   personality: string | null;
   style_notes: string | null;
@@ -152,6 +190,10 @@ export function identityFromAppearance(a: Record<string, string>) {
   return parts.join(", ");
 }
 
-export function composePrompt(persona: Pick<Persona, "identity_prompt" | "style_notes"> | null, scene: string) {
-  return [persona?.identity_prompt, scene.trim(), persona?.style_notes].filter((s) => s && s.trim()).join(", ");
+export function composePrompt(persona: Pick<Persona, "identity_prompt" | "style_notes"> | null, scene: string, realism = true) {
+  return [persona?.identity_prompt, scene.trim(), persona?.style_notes, realism ? REALISM : ""].filter((s) => s && s.trim()).join(", ");
+}
+
+export function composeNegative(persona: Pick<Persona, "negative_prompt"> | null, extra: string, realism = true) {
+  return [persona?.negative_prompt, extra, realism ? REALISM_AVOID : ""].filter((s) => s && s.trim()).join(", ");
 }

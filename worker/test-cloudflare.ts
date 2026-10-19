@@ -7,12 +7,22 @@ async function main() {
   const PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
   let lastBody: Record<string, unknown> = {};
   let lastAuth = "";
+  let lastForm: { contentType: string; fields: string[]; prompt: string } = { contentType: "", fields: [], prompt: "" };
   const server = createServer(async (req, res) => {
     const chunks: Buffer[] = [];
     for await (const c of req) chunks.push(c as Buffer);
     lastAuth = String(req.headers.authorization);
     const json = (o: unknown, s = 200) => { res.writeHead(s, { "content-type": "application/json" }); res.end(JSON.stringify(o)); };
     if (req.url?.includes("/ai/models/search")) return json({ success: true, result: [] });
+    if (req.url?.endsWith("/ai/run/@cf/black-forest-labs/flux-2-klein-9b")) {
+      const raw = Buffer.concat(chunks).toString("latin1");
+      lastForm = {
+        contentType: String(req.headers["content-type"]),
+        fields: [...raw.matchAll(/; name="([^"]+)"/g)].map((m) => m[1]),
+        prompt: (raw.match(/name="prompt"\r\n\r\n([^\r]*)/) ?? [])[1] ?? "",
+      };
+      return json({ success: true, result: { image: PNG } });
+    }
     if (req.url?.endsWith("/ai/run/@cf/black-forest-labs/flux-1-schnell")) {
       lastBody = JSON.parse(Buffer.concat(chunks).toString());
       if (String(lastBody.prompt).includes("FAIL400")) return json({ success: false, errors: [{ message: "bad" }] }, 400);
@@ -44,12 +54,26 @@ async function main() {
   assert.equal(lastBody.steps, 8, "steps clamped to 8");
   assert.match(String(lastBody.prompt), /Avoid: blurry/);
   assert.ok((r.costUsd ?? 1) < 0.002, "cost per image is fractions of a cent");
-  assert.equal(Math.round(estimateNeurons({ model: "", maxSteps: 8, tileNeurons: 4.8, stepNeurons: 9.6 }, 1024, 1024, 4) * 10) / 10, 57.6);
+  assert.equal(Math.round(estimateNeurons({ tileNeurons: 4.8, stepNeurons: 9.6 }, 1024, 1024, 4) * 10) / 10, 57.6);
   console.log("✓ cloudflare flux schnell");
 
   await assert.rejects(cloudflareProvider.run({ ...job, prompt: "FAIL400" }, { references: [], onProgress: () => {}, log: () => {} }), PermanentError);
   await assert.rejects(cloudflareProvider.run({ ...job, workflow: "nope" }, { references: [], onProgress: () => {}, log: () => {} }), PermanentError);
   console.log("✓ cloudflare error handling");
+  // klein with references: references are shrunk below 512px and sent as multipart
+  const sharp = (await import("sharp")).default;
+  const big = await sharp({ create: { width: 1200, height: 1600, channels: 3, background: "#c99272" } }).jpeg().toBuffer();
+  const { shrinkReference } = await import("./providers/cloudflare");
+  const small = await shrinkReference(big);
+  assert.ok(small.width < 512 && small.height < 512, `ref shrunk (${small.width}x${small.height})`);
+  const refs = [0, 1].map((i) => ({ filename: `r${i}.jpg`, mime: "image/jpeg", data: big, signedUrl: "" }));
+  const k = await cloudflareProvider.run({ ...job, workflow: "cf_klein_ref", params: { width: 832, height: 1248, seed: 7 } }, { references: refs, onProgress: () => {}, log: () => {} });
+  assert.match(lastForm.contentType, /multipart\/form-data/);
+  assert.deepEqual(lastForm.fields.sort(), ["height", "input_image_0", "input_image_1", "prompt", "seed", "width"]);
+  assert.match(lastForm.prompt, /images 0-1 is the subject/);
+  assert.ok((k.costUsd ?? 0) > 0.014 && (k.costUsd ?? 1) < 0.02, `klein cost ${k.costUsd}`);
+  await assert.rejects(cloudflareProvider.run({ ...job, workflow: "cf_klein_ref" }, { references: [], onProgress: () => {}, log: () => {} }), PermanentError);
+  console.log("✓ cloudflare klein with references");
   server.close();
 }
 main().catch((e) => { console.error(e); process.exit(1); });

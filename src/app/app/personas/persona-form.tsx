@@ -16,6 +16,7 @@ export function PersonaForm({ persona }: { persona?: Persona }) {
   return (
     <form action={action} className="space-y-8">
       {persona && <input type="hidden" name="id" value={persona.id} />}
+      {persona?.likeness && <input type="hidden" name="likeness" value={persona.likeness} />}
 
       <div className="grid gap-4 md:grid-cols-2">
         <div>
@@ -124,6 +125,9 @@ export function PersonaForm({ persona }: { persona?: Persona }) {
         </div>
       </details>
 
+      {persona?.likeness === "self" ? (
+        <p className="rounded-lg border border-line bg-paper p-4 text-sm">This is your digital twin. Your consent is on file; the face comes from your reference photos.</p>
+      ) : (
       <fieldset className="rounded-lg border border-line bg-paper p-4">
         <legend className="px-1 font-semibold">Likeness</legend>
         <label className="flex items-start gap-3">
@@ -137,6 +141,7 @@ export function PersonaForm({ persona }: { persona?: Persona }) {
           </label>
         )}
       </fieldset>
+      )}
 
       <div className="flex items-center gap-4">
         <button className="btn btn-primary" disabled={pending}>{pending ? "Saving…" : persona ? "Save persona" : "Create persona"}</button>

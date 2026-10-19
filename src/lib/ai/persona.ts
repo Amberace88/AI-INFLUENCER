@@ -22,11 +22,16 @@ export type PersonaDraft = {
 
 const str = (v: unknown, max = 600) => (typeof v === "string" ? v.trim().slice(0, max) : "");
 
-export async function draftPersona(input: { brief: string; role: string; language: string; brandName?: string }): Promise<PersonaDraft> {
+export async function draftPersona(input: { brief: string; role: string; language: string; brandName?: string; twin?: boolean }): Promise<PersonaDraft> {
   const role = ROLES.find((r) => r.id === input.role) ?? ROLES[0];
   const lang = LANGUAGES.find((l) => l.id === input.language) ?? LANGUAGES[0];
 
-  const system = `You design fictional AI personas for brands and creators. The persona must be clearly fictional,
+  const system = input.twin
+    ? `You write the public persona profile of a REAL person who is creating an AI "digital twin" of themselves.
+Use only what their brief says about them; do not invent biographical facts, credentials, family or numbers.
+Keep the given name exactly if they mention one. Appearance comes from their photos, so return empty strings for "appearance".
+Write every text field in ${(LANGUAGES.find((l) => l.id === input.language) ?? LANGUAGES[0]).label}, except "style_notes" in English. Reply with ONE JSON object only, no commentary.`
+    : `You design fictional AI personas for brands and creators. The persona must be clearly fictional,
 not based on any real or famous person. Write every text field in ${lang.label}, except "appearance" and
 "style_notes" which must be in English because they are fed to an image model. Appearance must be very
 concrete and visual (age range, hair, eyes, skin, build, 2-3 distinctive features, signature wardrobe) so the

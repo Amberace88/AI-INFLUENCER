@@ -31,7 +31,7 @@ const SHEET: { scene: PhotoScene; keep: boolean; score: number }[] = [
 
 const FAQ = [
   { q: "Is it obvious the persona is AI?", a: "It should be. Every persona is fictional, and we recommend labelling posts as AI-generated. EU rules already require disclosure for synthetic content that could pass as real, and Persona Studio is built around being upfront about it." },
-  { q: "Can I make a persona of a real person?", a: "Only with that person's documented, written consent, and you confirm it when creating the persona. Personas of public figures or anyone who has not agreed are not allowed." },
+  { q: "Can I make a persona of myself?", a: "Yes, on paid plans. Upload two to four clear photos, confirm they are of you and that you are 18 or older, and your twin uses them as its face reference. The confirmation is stored with the date. Other real people need their own written consent; public figures are not allowed." },
   { q: "How consistent is the face, really?", a: "Good, not perfect. Fast drafts keep the look from the description; reference-photo workflows hold the face much better. Every frame gets a score, and you only publish what you keep. We show you the numbers instead of promising perfection." },
   { q: "What languages can a persona write in?", a: "Spanish, English, German, French, Italian, Portuguese, Latvian and Russian today. One persona writes in one main language, so the voice stays consistent." },
   { q: "What happens when my credits run out?", a: "Generation pauses until your monthly refill, or you add a credit pack. Failed generations are refunded automatically, so you never pay for a technical error." },
@@ -94,6 +94,34 @@ export default async function Home() {
             </p>
           </div>
           <div className="mt-12"><RolesShowcase /></div>
+        </section>
+
+        {/* Digital twin */}
+        <section className="mx-auto max-w-6xl px-5 pb-20 md:pb-28">
+          <div className="grid items-center gap-10 overflow-hidden rounded-3xl bg-paper p-6 ring-1 ring-line md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] md:p-12">
+            <div>
+              <h2 className="text-[clamp(2rem,4.5vw,3.2rem)] font-extrabold">Or be the face yourself.</h2>
+              <p className="mt-4 text-lg text-muted">
+                Upload a few photos of yourself and get a digital twin: the same face in any scene, posts written in your voice,
+                while you run the business. Perfect for founders, consultants and local experts who should be on camera but never have the time.
+              </p>
+              <ul className="mt-6 space-y-2 text-sm">
+                <li className="flex gap-2"><span className="text-ok" aria-hidden>✓</span>Your photos stay private and only power your own generations</li>
+                <li className="flex gap-2"><span className="text-ok" aria-hidden>✓</span>You confirm consent once; it&apos;s stored with the date</li>
+                <li className="flex gap-2"><span className="text-ok" aria-hidden>✓</span>Included in Starter, Pro and Business</li>
+              </ul>
+              <Link href={signedIn ? "/app/personas/new?mode=me" : "/login?mode=signup"} className="btn btn-primary mt-8 px-6 py-3 text-base">Make my digital twin</Link>
+            </div>
+            <div className="grid grid-cols-[0.8fr_1.2fr] items-end gap-3">
+              <figure>
+                <div className="frame"><PersonaPhoto look="marco" scene="studio" sizes="200px" className="w-full rounded-[2px]" alt="Reference photo of a fictional business owner" /><span className="frame-no">Your photo</span></div>
+              </figure>
+              <figure>
+                <div className="frame"><PersonaPhoto look="marco" scene="office" sizes="300px" className="w-full rounded-[2px]" alt="The same fictional man on a renovation site, generated" /><span className="frame-no">Your twin, on site</span></div>
+              </figure>
+              <figcaption className="col-span-2 text-xs text-muted">Example with a fictional person. Left: the reference you upload. Right: a generated scene with the same face.</figcaption>
+            </div>
+          </div>
         </section>
 
         {/* How it works */}

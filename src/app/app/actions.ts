@@ -1,10 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
+import { TWIN_STATEMENT } from "@/lib/consent";
 import { redirect } from "next/navigation";
 import { randomUUID } from "node:crypto";
 import { requireUser } from "@/lib/supabase/server";
-import { APPEARANCE_FIELDS, composePrompt, identityFromAppearance, sizeFor, workflowById, type Persona } from "@/lib/catalog";
+import { APPEARANCE_FIELDS, composeNegative, composePrompt, identityFromAppearance, sizeFor, workflowById, type Persona } from "@/lib/catalog";
 import { BENCHMARK_BASE_SEED, BENCHMARK_SCENES } from "@/lib/benchmark";
 import { draftPersona, draftPosts } from "@/lib/ai/persona";
 import { AiConfigError } from "@/lib/ai/text";
@@ -20,6 +22,8 @@ const RPC_ERRORS: Record<string, string> = {
   unknown_kind: "This generation type is not available.",
   job_not_cancelable: "Only waiting jobs can be cancelled.",
   persona_limit_reached: "Your plan's persona limit is reached. Upgrade the plan or delete a persona.",
+  twin_needs_paid_plan: "A persona of yourself is available on Starter, Pro and Business plans.",
+  twin_already_exists: "You already have a persona of yourself. Edit that one instead.",
 };
 function friendly(msg: string) {
   const key = Object.keys(RPC_ERRORS).find((k) => msg.includes(k));
@@ -37,7 +41,10 @@ export async function savePersona(_: ActionResult | null, form: FormData): Promi
   if (!name) return { ok: false, error: "Give the persona a name." };
   const isFictional = form.get("is_fictional") === "on";
   const consent = form.get("consent_confirmed") === "on";
-  if (!isFictional && !consent) {
+  const editingTwin = id
+    ? (await supabase.from("personas").select("likeness").eq("id", id).maybeSingle()).data?.likeness === "self"
+    : false;
+  if (!editingTwin && !isFictional && !consent) {
     return { ok: false, error: "A persona based on a real person needs their documented consent." };
   }
 
@@ -67,7 +74,9 @@ export async function savePersona(_: ActionResult | null, form: FormData): Promi
   };
 
   if (id) {
-    const { error } = await supabase.from("personas").update(row).eq("id", id);
+    const patch: Record<string, unknown> = { ...row };
+    if (editingTwin) { delete patch.is_fictional; delete patch.consent_confirmed; }
+    const { error } = await supabase.from("personas").update(patch).eq("id", id);
     if (error) return { ok: false, error: error.message };
     revalidatePath(`/app/personas/${id}`);
     return { ok: true, message: "Persona saved.", id };
@@ -213,6 +222,7 @@ export type GenerateInput = {
   seed: number | null;
   steps: number | null;
   cfg: number | null;
+  realism?: boolean;
 };
 
 export async function generate(input: GenerateInput): Promise<ActionResult> {
@@ -233,8 +243,9 @@ export async function generate(input: GenerateInput): Promise<ActionResult> {
   }
 
   const { width, height } = sizeFor(wf, input.sizeId);
-  const prompt = composePrompt(persona, input.scene);
-  const negative = [persona?.negative_prompt, input.negative].filter((s) => s && s.trim()).join(", ");
+  const realism = input.realism !== false;
+  const prompt = composePrompt(persona, input.scene, realism);
+  const negative = composeNegative(persona, input.negative, realism);
   const count = Math.min(Math.max(1, Math.round(input.count)), 4);
   const baseSeed = input.seed ?? Math.floor(Math.random() * 2 ** 31 - 10);
 
@@ -287,7 +298,7 @@ export async function runBenchmark(personaId: string, workflowId: string): Promi
       p_provider: wf.provider,
       p_workflow: wf.id,
       p_prompt: composePrompt(persona as Persona, scene.prompt),
-      p_negative_prompt: (persona as Persona).negative_prompt,
+      p_negative_prompt: composeNegative(persona as Persona, ""),
       p_params: { width, height, seed: BENCHMARK_BASE_SEED + i, steps: wf.defaults.steps, cfg: wf.defaults.cfg, use_references: wf.needsReference, scene: scene.prompt },
       p_benchmark_run_id: run.id,
       p_scene_key: scene.key,
@@ -351,4 +362,85 @@ export async function adminGrantCredits(userId: string, amount: number, note: st
   if (error) return { ok: false, error: error.message.includes("not_admin") ? "Admin only." : error.message };
   revalidatePath("/app", "layout");
   return { ok: true, message: `${amount > 0 ? "Added" : "Removed"} ${Math.abs(amount)} credits.` };
+}
+
+// A generated frame becomes the persona's main reference photo.
+export async function setAssetAsReference(assetId: string): Promise<ActionResult> {
+  const { supabase, user } = await requireUser();
+  const { data: asset } = await supabase.from("assets").select("storage_path, persona_id, mime").eq("id", assetId).eq("owner_id", user.id).maybeSingle();
+  if (!asset?.persona_id) return { ok: false, error: "This frame has no persona." };
+  const dl = await supabase.storage.from("outputs").download(asset.storage_path);
+  if (dl.error) return { ok: false, error: dl.error.message };
+  const ext = asset.mime === "image/png" ? "png" : asset.mime === "image/webp" ? "webp" : "jpg";
+  const path = `${user.id}/${asset.persona_id}/${randomUUID()}.${ext}`;
+  const up = await supabase.storage.from("references").upload(path, dl.data, { contentType: asset.mime });
+  if (up.error) return { ok: false, error: up.error.message };
+  await supabase.from("persona_references").update({ is_primary: false }).eq("persona_id", asset.persona_id);
+  const ins = await supabase.from("persona_references").insert({ persona_id: asset.persona_id, storage_path: path, is_primary: true });
+  if (ins.error) return { ok: false, error: ins.error.message };
+  await supabase.from("assets").update({ review_status: "accepted" }).eq("id", assetId);
+  revalidatePath(`/app/personas/${asset.persona_id}`);
+  revalidatePath("/app/studio");
+  return { ok: true, message: "Now the main reference. New shots keep this face." };
+}
+
+// ------------------------------------------------- digital twin (yourself)
+
+export async function createTwin(_: ActionResult | null, form: FormData): Promise<ActionResult> {
+  const { supabase, user } = await requireUser();
+  if (form.get("consent_self") !== "on" || form.get("consent_age") !== "on" || form.get("consent_label") !== "on") {
+    return { ok: false, error: "Please confirm all three statements." };
+  }
+  const name = String(form.get("name") || "").trim();
+  if (!name) return { ok: false, error: "Enter the name your persona should use." };
+  const files = form.getAll("files").filter((f): f is File => f instanceof File && f.size > 0).slice(0, 4);
+  if (!files.length) return { ok: false, error: "Add at least one clear photo of your face." };
+  for (const f of files) {
+    if (!ALLOWED.has(f.type)) return { ok: false, error: `${f.name}: use PNG, JPEG or WebP.` };
+    if (f.size > MAX_BYTES) return { ok: false, error: `${f.name}: larger than 10 MB.` };
+  }
+
+  const { data: me } = await supabase.from("profiles").select("plan:plans(allow_twin, max_personas)").eq("id", user.id).single();
+  const plan = me?.plan as unknown as { allow_twin: boolean; max_personas: number } | null;
+  if (!plan?.allow_twin) return { ok: false, error: RPC_ERRORS.twin_needs_paid_plan };
+  const { count } = await supabase.from("personas").select("id", { count: "exact", head: true }).eq("owner_id", user.id);
+  if ((count ?? 0) >= plan.max_personas) return { ok: false, error: RPC_ERRORS.persona_limit_reached };
+
+  const role = String(form.get("role") || "influencer");
+  const language = String(form.get("language") || "es");
+  const brandName = String(form.get("brand_name") || "").trim();
+  const brief = String(form.get("brief") || "").trim();
+
+  let profile: Partial<Awaited<ReturnType<typeof draftPersona>>> = {};
+  if (brief.length >= 15) {
+    const r = await withCredits("text_persona", () => draftPersona({ brief: `My name is ${name}. ${brief}`, role, language, brandName, twin: true }));
+    if (!r.ok) return r;
+    profile = r.value;
+  }
+
+  const { data: persona, error } = await supabase
+    .from("personas")
+    .insert({
+      name, likeness: "self", role, language, brand_name: brandName || null,
+      tagline: profile.tagline || null, bio: profile.bio || null, backstory: profile.backstory || null,
+      personality: profile.personality || null, voice: profile.voice || null, values_text: profile.values_text || null,
+      topics: profile.topics ?? [], audience: profile.audience || null, dos: profile.dos || null, donts: profile.donts || null,
+      locations: profile.locations || null, style_notes: profile.style_notes || null,
+      identity_prompt: "", negative_prompt: "blurry, deformed hands, extra fingers, watermark, text",
+    })
+    .select("id")
+    .single();
+  if (error) return { ok: false, error: friendly(error.message) };
+
+  for (const [i, file] of files.entries()) {
+    const path = `${user.id}/${persona.id}/${randomUUID()}.${ALLOWED.get(file.type)}`;
+    const up = await supabase.storage.from("references").upload(path, file, { contentType: file.type });
+    if (up.error) return { ok: false, error: up.error.message };
+    await supabase.from("persona_references").insert({ persona_id: persona.id, storage_path: path, is_primary: i === 0 });
+  }
+  const ua = (await headers()).get("user-agent")?.slice(0, 300) ?? null;
+  await supabase.from("likeness_consents").insert({ persona_id: persona.id, kind: "self", statement: TWIN_STATEMENT, user_agent: ua });
+
+  revalidatePath("/app/personas");
+  redirect(`/app/personas/${persona.id}?created=twin`);
 }

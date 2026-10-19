@@ -12,7 +12,10 @@ export function GenerateForm({
   personas, personasWithRefs, costs, initialPersona, initialScene,
 }: { personas: Persona[]; personasWithRefs: string[]; costs: Record<string, number>; initialPersona: string; initialScene: string }) {
   const [personaId, setPersonaId] = useState(initialPersona);
-  const [workflowId, setWorkflowId] = useState(WORKFLOWS[0].id);
+  const hasRefs = (id: string) => personasWithRefs.includes(id);
+  const bestWorkflow = (id: string) => (hasRefs(id) ? "cf_klein_ref" : "cf_klein_text");
+  const [workflowId, setWorkflowId] = useState(bestWorkflow(initialPersona));
+  const [realism, setRealism] = useState(true);
   const [scene, setScene] = useState(initialScene.slice(0, 1500));
   const [negative, setNegative] = useState("");
   const [sizeId, setSizeId] = useState("portrait");
@@ -26,7 +29,7 @@ export function GenerateForm({
   const persona = personas.find((p) => p.id === personaId) ?? null;
   const wf = WORKFLOWS.find((w) => w.id === workflowId)!;
   const dims = sizeFor(wf, sizeId);
-  const preview = useMemo(() => composePrompt(persona, scene || "…your scene…"), [persona, scene]);
+  const preview = useMemo(() => composePrompt(persona, scene || "…your scene…", realism), [persona, scene, realism]);
   const missingRef = wf.needsReference && (!persona || !personasWithRefs.includes(persona.id));
   const credits = (costs[wf.kind] ?? 0) * count;
 
@@ -36,10 +39,25 @@ export function GenerateForm({
     start(async () => {
       const r = await generate({
         personaId: personaId || null, workflowId, scene, negative, sizeId, count,
-        seed: seed ? Number(seed) : null, steps: steps ? Number(steps) : null, cfg: cfg ? Number(cfg) : null,
+        seed: seed ? Number(seed) : null, steps: steps ? Number(steps) : null, cfg: cfg ? Number(cfg) : null, realism,
       });
       setMsg(r.ok ? { ok: true, text: r.message ?? "Queued." } : { ok: false, text: r.error });
     });
+  };
+
+  const WorkflowCard = ({ w }: { w: (typeof WORKFLOWS)[number] }) => {
+    const blocked = w.needsReference && (!persona || !hasRefs(persona.id));
+    return (
+      <label className={`relative cursor-pointer rounded-lg border p-3 transition-colors ${w.id === workflowId ? "border-accent bg-paper ring-1 ring-accent" : "border-line bg-paper/60 hover:border-ink"}`}>
+        <input type="radio" name="workflow" value={w.id} checked={w.id === workflowId} onChange={() => setWorkflowId(w.id)} className="sr-only" />
+        <span className="flex items-baseline justify-between gap-2">
+          <span className="font-semibold">{w.label}</span>
+          <span className="text-xs tabular-nums text-muted">{costs[w.kind] ?? "?"} cr</span>
+        </span>
+        <span className="mt-1 block text-sm text-muted">{w.hint}</span>
+        {blocked && <span className="mt-1 block text-xs text-warn">Needs a reference photo</span>}
+      </label>
+    );
   };
 
   if (!personas.length) {
@@ -57,7 +75,7 @@ export function GenerateForm({
         <span className="label">Persona</span>
         <div className="flex flex-wrap gap-2">
           {personas.map((p) => (
-            <button type="button" key={p.id} onClick={() => setPersonaId(p.id)} aria-pressed={p.id === personaId}
+            <button type="button" key={p.id} onClick={() => { setPersonaId(p.id); setWorkflowId(bestWorkflow(p.id)); }} aria-pressed={p.id === personaId}
               className={`rounded-full border px-4 py-1.5 text-sm font-semibold ${p.id === personaId ? "border-ink bg-ink text-paper" : "border-line bg-paper hover:border-ink"}`}>
               {p.name}
             </button>
@@ -80,22 +98,21 @@ export function GenerateForm({
       </div>
 
       <fieldset>
-        <legend className="label">Workflow</legend>
-        <div className="grid gap-2 md:grid-cols-2">
-          {WORKFLOWS.map((w) => (
-            <label key={w.id} className={`cursor-pointer rounded-lg border p-3 ${w.id === workflowId ? "border-accent bg-paper ring-1 ring-accent" : "border-line bg-paper/60 hover:border-ink"}`}>
-              <input type="radio" name="workflow" value={w.id} checked={w.id === workflowId} onChange={() => setWorkflowId(w.id)} className="sr-only" />
-              <span className="flex items-baseline justify-between gap-2">
-                <span className="font-semibold">{w.label}</span>
-                <span className="text-xs tabular-nums text-muted">{costs[w.kind] ?? "?"} cr</span>
-              </span>
-              <span className="mt-1 block text-sm text-muted">{w.hint}</span>
-            </label>
-          ))}
+        <legend className="label">How to shoot</legend>
+        <div className="grid gap-2 md:grid-cols-3">
+          {WORKFLOWS.filter((w) => w.primary).map((w) => <WorkflowCard key={w.id} w={w} />)}
         </div>
+        <details className="mt-2" open={!WORKFLOWS.find((w) => w.id === workflowId)?.primary}>
+          <summary className="cursor-pointer text-sm text-muted hover:text-ink">More engines (ComfyUI on your Mac, fal.ai)</summary>
+          <div className="mt-2 grid gap-2 md:grid-cols-2">
+            {WORKFLOWS.filter((w) => !w.primary).map((w) => <WorkflowCard key={w.id} w={w} />)}
+          </div>
+        </details>
         {missingRef && (
           <p className="mt-2 text-sm text-warn">
-            {persona ? <>Add a reference photo to <Link className="underline" href={`/app/personas/${persona.id}`}>{persona.name}</Link> to use this workflow.</> : "Pick a persona."}
+            {persona ? <>{persona.name} has no reference photo yet. Shoot a portrait with &ldquo;Photo from description&rdquo;, then open it in the{" "}
+              <Link className="underline" href="/app/sheet">contact sheet</Link> and choose &ldquo;Use as reference&rdquo;, or{" "}
+              <Link className="underline" href={`/app/personas/${persona.id}`}>upload photos</Link>.</> : "Pick a persona."}
           </p>
         )}
       </fieldset>
@@ -103,13 +120,13 @@ export function GenerateForm({
       <div className="flex flex-wrap gap-6">
         <fieldset>
           <legend className="label">Format</legend>
-          <div className="flex flex-wrap gap-1 rounded-full border border-line bg-paper p-1 text-sm">
+          <div className={`flex flex-wrap gap-1 rounded-full border border-line bg-paper p-1 text-sm ${wf.squareOnly ? "pointer-events-none opacity-40" : ""}`}>
             {SIZES.map((s) => (
-              <button type="button" key={s.id} onClick={() => setSizeId(s.id)} aria-pressed={s.id === sizeId}
+              <button type="button" key={s.id} onClick={() => setSizeId(s.id)} aria-pressed={s.id === sizeId} disabled={wf.squareOnly}
                 className={`rounded-full px-3 py-1 ${s.id === sizeId ? "bg-ink text-paper" : "text-muted hover:text-ink"}`}>{s.label}</button>
             ))}
           </div>
-          <p className="mt-1 text-xs tabular-nums text-muted">{dims.width} × {dims.height} px</p>
+          <p className="mt-1 text-xs tabular-nums text-muted">{wf.squareOnly ? "Quick sketch is always square, 1024 × 1024 px" : `${dims.width} × ${dims.height} px`}</p>
         </fieldset>
         <fieldset>
           <legend className="label">Takes</legend>
@@ -124,6 +141,10 @@ export function GenerateForm({
 
       <details className="rounded-lg border border-line bg-paper p-4">
         <summary className="cursor-pointer font-semibold">Advanced</summary>
+        <label className="mt-4 flex items-start gap-3 text-sm">
+          <input type="checkbox" checked={realism} onChange={(e) => setRealism(e.target.checked)} className="mt-0.5 size-4 accent-[var(--accent)]" />
+          <span><span className="font-semibold">Natural photo look</span> <span className="text-muted">(recommended): candid expression, real skin texture, no stock-photo poses</span></span>
+        </label>
         <div className="mt-4 grid gap-4 sm:grid-cols-3">
           <div><label className="label" htmlFor="seed">Seed (blank = random)</label><input id="seed" inputMode="numeric" className="field" value={seed} onChange={(e) => setSeed(e.target.value.replace(/\D/g, ""))} /></div>
           <div><label className="label" htmlFor="steps">Steps ({wf.defaults.steps})</label><input id="steps" inputMode="numeric" className="field" value={steps} onChange={(e) => setSteps(e.target.value.replace(/\D/g, ""))} /></div>

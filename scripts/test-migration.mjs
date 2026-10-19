@@ -166,3 +166,18 @@ await assert.rejects(as(B, `select admin_grant_credits($1, 100)`, [B]), /not_adm
 await assert.rejects(as(B, `select * from admin_list_users()`), /not_admin/);
 assert.ok((await as(A, `select count(*)::int c from personas`)).rows[0].c >= 6, "admin reads all personas");
 console.log("✓ admin: single admin, overview, users, plans, credits");
+
+// ---- migration 4: twin + face cost ----
+const D = "44444444-4444-4444-4444-444444444444";
+await db.exec(`insert into auth.users (id, email) values ('${D}','d@test.dev')`);
+await assert.rejects(as(D, `insert into personas (name, likeness) values ('Me', 'self')`), /twin_needs_paid_plan/);
+await asService(`update profiles set plan_id='starter' where id=$1`, [D]);
+const twin = (await as(D, `insert into personas (name, likeness) values ('Me', 'self') returning id, is_fictional, consent_confirmed`)).rows[0];
+assert.equal(twin.is_fictional, false);
+assert.equal(twin.consent_confirmed, true);
+await as(D, `insert into likeness_consents (persona_id, kind, statement) values ($1, 'self', 'These photos are of me')`, [twin.id]);
+assert.equal((await as(B, `select * from likeness_consents`)).rows.length, 0, "consents private");
+await asService(`update profiles set plan_id='pro' where id=$1`, [D]);
+await assert.rejects(as(D, `insert into personas (name, likeness) values ('Me again', 'self')`), /twin_already_exists/);
+assert.equal((await as(D, `select credits from generation_costs where kind='image_ref'`)).rows[0].credits, 2);
+console.log("✓ twin: paid plan only, one per account, consent stored");
