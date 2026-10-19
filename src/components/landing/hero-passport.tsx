@@ -47,8 +47,8 @@ export function HeroPassport() {
   return (
     <div className="rise-3 relative" onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
       <div className="relative grid overflow-hidden rounded-2xl bg-paper shadow-[0_30px_80px_-30px_rgba(23,32,43,.45)] ring-1 ring-line sm:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)]">
-        <div className="relative bg-ink p-3 pb-9">
-          <PersonaPhoto key={shot.scene} scene={shot.scene} look="lucia" priority={i === 0} sizes="(min-width: 1024px) 280px, 50vw" className="developing w-full rounded-[3px]" alt={`Lucía, AI persona, ${shot.place}`} />
+        <div className="relative flex flex-col bg-ink p-3 pb-9">
+          <PersonaPhoto key={shot.scene} scene={shot.scene} look="lucia" priority={i === 0} sizes="(min-width: 1024px) 280px, 50vw" className="developing w-full rounded-[3px] sm:aspect-auto sm:min-h-[340px] sm:flex-1" alt={`Lucía, AI persona, ${shot.place}`} />
           <span className="absolute bottom-3 left-3 text-xs tabular-nums safelight">{String(i + 1).padStart(2, "0")}A · {shot.place}</span>
           <span key={`k${i}`} className="stamp stamp-in text-ok">KEEP</span>
         </div>

@@ -56,7 +56,7 @@ export function RolesShowcase() {
       </div>
 
       <div id="role-panel" role="tabpanel" key={r.id} className="panel-in grid gap-5 rounded-2xl bg-paper p-4 ring-1 ring-line sm:grid-cols-[180px_1fr] sm:p-5">
-        <div className="frame">
+        <div className="frame self-start">
           <PersonaPhoto scene={r.scene} look={r.look} sizes="180px" className="developing w-full rounded-[2px]" alt={`${r.who}, AI persona`} />
           <span className="frame-no">{r.platform} · {r.lang}</span>
         </div>

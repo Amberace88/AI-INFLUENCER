@@ -54,8 +54,13 @@ Return JSON with exactly these keys:
  "appearance": {"age":"","presentation":"","hair":"","eyes":"","skin":"","build":"","features":"","wardrobe":""}
 }`;
 
-  const raw = await chat([{ role: "system", content: system }, { role: "user", content: user }], { maxTokens: 1800, temperature: 0.9 });
-  const j = parseJson<Record<string, unknown>>(raw);
+  const ask = () => chat([{ role: "system", content: system }, { role: "user", content: user }], { maxTokens: 1800, temperature: 0.9 });
+  let j: Record<string, unknown>;
+  try {
+    j = parseJson<Record<string, unknown>>(await ask());
+  } catch {
+    j = parseJson<Record<string, unknown>>(await ask());
+  }
   const appearanceIn = (j.appearance ?? {}) as Record<string, unknown>;
   const appearance: Record<string, string> = {};
   for (const k of ["age", "presentation", "hair", "eyes", "skin", "build", "features", "wardrobe"]) appearance[k] = str(appearanceIn[k], 200);
@@ -106,14 +111,19 @@ Always: ${persona.dos ?? ""}
 Never: ${persona.donts ?? ""}
 ${persona.brand_name ? `You represent ${persona.brand_name}. Mention it naturally, never as a hard sell.` : ""}
 Never claim to be a real human if asked; never invent prices, medical, legal or financial claims.
-Reply with ONE JSON array only.`;
+Reply with ONE valid JSON array only. Inside strings use \\n for line breaks.`;
 
   const user = `Write ${count} different ${platform.label} posts (${platform.hint}).
 Topic or brief: """${input.topic.slice(0, 800) || (persona.topics ?? []).join(", ")}"""
 Each item: {"caption":"...","hashtags":["..."],"image_idea":"one sentence in English describing the photo of you that goes with it"}`;
 
-  const raw = await chat([{ role: "system", content: system }, { role: "user", content: user }], { maxTokens: 400 * count + 200, temperature: 0.9 });
-  const arr = parseJson<unknown[]>(raw);
+  const ask = () => chat([{ role: "system", content: system }, { role: "user", content: user }], { maxTokens: 400 * count + 200, temperature: 0.9 });
+  let arr: unknown[];
+  try {
+    arr = parseJson<unknown[]>(await ask());
+  } catch {
+    arr = parseJson<unknown[]>(await ask()); // one retry: model output varies
+  }
   const posts = (Array.isArray(arr) ? arr : [])
     .map((p) => p as Record<string, unknown>)
     .map((p) => ({
