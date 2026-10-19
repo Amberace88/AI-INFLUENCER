@@ -444,3 +444,11 @@ export async function createTwin(_: ActionResult | null, form: FormData): Promis
   revalidatePath("/app/personas");
   redirect(`/app/personas/${persona.id}?created=twin`);
 }
+
+export async function reportDefect(assetId: string, reason: string): Promise<ActionResult> {
+  const { supabase } = await requireUser();
+  const { data, error } = await supabase.rpc("report_defect", { p_asset_id: assetId, p_reason: reason });
+  if (error) return { ok: false, error: error.message.includes("asset_not_found") ? "Frame not found." : error.message };
+  revalidatePath("/app", "layout");
+  return { ok: true, message: data > 0 ? `Thanks. ${data} credit${data === 1 ? "" : "s"} returned.` : "Thanks, reported. (Credits for this frame were already returned or your monthly defect refunds are used up.)" };
+}

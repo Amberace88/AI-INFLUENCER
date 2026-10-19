@@ -10,7 +10,8 @@ import { config } from "./config";
 import { comfyuiProvider } from "./providers/comfyui";
 import { falProvider } from "./providers/fal";
 import { cloudflareProvider } from "./providers/cloudflare";
-import { Job, PermanentError, Provider, ReferenceImage } from "./types";
+import { Job, PermanentError, Provider, ProviderResult, ReferenceImage } from "./types";
+import { acceptVisionLicence, inspect, qaEnabled, type QaResult } from "./qa";
 
 const all: Record<string, Provider> = { comfyui: comfyuiProvider, fal: falProvider, cloudflare: cloudflareProvider };
 const providers = config.providers.map((n) => {
@@ -68,7 +69,29 @@ async function processJob(job: Job) {
 
   try {
     const references = await loadReferences(job);
-    const result = await provider.run(job, { references, onProgress, log: (m) => log(`  ${m}`) });
+    // Generate, then let the QA model inspect. Defects are regenerated at our cost (new seed),
+    // up to QA_MAX_RETRIES; if every try fails the job fails and the client's credits are refunded.
+    const maxTries = 1 + Math.max(0, Number(process.env.QA_MAX_RETRIES ?? 2));
+    let result: ProviderResult | null = null;
+    let qa: QaResult = { verdict: "skipped", reason: qaEnabled() ? "" : "QA off" };
+    let extraCost = 0;
+    for (let t = 1; t <= maxTries; t++) {
+      const attemptJob = t === 1 ? job : { ...job, params: { ...job.params, seed: undefined } };
+      const r = await provider.run(attemptJob, { references, onProgress, log: (m) => log(`  ${m}`) });
+      if (!qaEnabled()) { result = r; break; }
+      try {
+        qa = await inspect(r.images[0].data);
+      } catch (e) {
+        qa = { verdict: "skipped", reason: `QA error: ${(e as Error).message}` };
+      }
+      if (qa.verdict !== "fail") { result = r; break; }
+      extraCost += r.costUsd ?? 0;
+      log(`  ⚠ QA rejected try ${t}/${maxTries}: ${qa.reason}`);
+      if (t === maxTries) throw new PermanentError(`Quality check rejected ${maxTries} tries (${qa.reason}). Credits returned.`);
+    }
+    if (!result) throw new Error("no result");
+    result.costUsd = (result.costUsd ?? 0) + extraCost;
+    result.meta = { ...(result.meta ?? {}), qa: { verdict: qa.verdict, reason: qa.reason } };
 
     const assets = [];
     for (const [i, img] of result.images.entries()) {
@@ -131,7 +154,9 @@ process.on("SIGINT", () => { if (stopping) process.exit(1); stopping = true; log
 process.on("SIGTERM", () => { stopping = true; });
 
 async function main() {
+  if (process.env.CF_VISION_LICENSE_ACCEPTED === "1") await acceptVisionLicence();
   const ok = await check();
+  log(qaEnabled() ? "✓ quality check on (Llama 3.2 Vision)" : "! quality check off: set CF_VISION_LICENSE_ACCEPTED=1 to enable");
   if (process.argv.includes("--check")) process.exit(ok ? 0 : 1);
   log("waiting for jobs…");
   while (!stopping) {

@@ -90,10 +90,10 @@ export const WORKFLOWS: Workflow[] = [
 
 /** Added to every photo prompt so results look like real photos, not stock or CGI. */
 export const REALISM =
-  "candid natural photograph, relaxed genuine expression, believable everyday pose, natural hand positions, " +
+  "candid natural photograph, relaxed genuine expression, believable everyday pose, anatomically correct with exactly two arms and two hands per person, natural hand positions, " +
   "real skin texture with visible pores, natural soft light, shot on a full-frame camera with a 35mm lens, shallow depth of field, subtle film grain";
 export const REALISM_AVOID =
-  "plastic or airbrushed skin, waxy face, exaggerated grin, stock-photo pose, hands raised in front of the body, extra fingers, CGI, 3D render, cartoon, oversaturated, HDR, watermark, text";
+  "plastic or airbrushed skin, waxy face, exaggerated grin, stock-photo pose, extra arms, extra hands, duplicated limbs, extra fingers, CGI, 3D render, cartoon, oversaturated, HDR, watermark, text";
 
 export const SIZES = [
   { id: "portrait", label: "Portrait 2:3", w: 2, h: 3 },

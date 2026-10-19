@@ -181,3 +181,20 @@ await asService(`update profiles set plan_id='pro' where id=$1`, [D]);
 await assert.rejects(as(D, `insert into personas (name, likeness) values ('Me again', 'self')`), /twin_already_exists/);
 assert.equal((await as(D, `select credits from generation_costs where kind='image_ref'`)).rows[0].credits, 2);
 console.log("✓ twin: paid plan only, one per account, consent stored");
+
+// ---- migration 5: defect reports ----
+{
+  const E = "55555555-5555-5555-5555-555555555555";
+  await db.exec(`insert into auth.users (id, email) values ('${E}','e@test.dev')`);
+  const pe = (await as(E, `insert into personas (name) values ('P') returning id`)).rows[0].id;
+  const jid = (await as(E, `select enqueue_job($1,'image_ref','cloudflare','cf_klein_text','a scene') as id`, [pe])).rows[0].id;
+  await asService(`update jobs set status='succeeded' where id=$1`, [jid]);
+  const aid = (await asService(`insert into assets (job_id, owner_id, persona_id, storage_path) values ($1,$2,$3,'x') returning id`, [jid, E, pe])).rows[0].id;
+  const before = await balance(E);
+  assert.equal((await as(E, `select report_defect($1, 'four hands') as r`, [aid])).rows[0].r, 2);
+  assert.equal(await balance(E), before + 2, "defect refunded");
+  assert.equal((await as(E, `select report_defect($1, 'again') as r`, [aid])).rows[0].r, 0, "no double refund");
+  await assert.rejects(as(B, `select report_defect($1, 'x')`, [aid]), /asset_not_found/);
+  assert.equal((await as(E, `select review_status from assets where id=$1`, [aid])).rows[0].review_status, "rejected");
+  console.log("✓ defect reports refund once, own assets only");
+}

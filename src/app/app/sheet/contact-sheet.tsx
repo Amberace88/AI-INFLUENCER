@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { SCORE_CRITERIA, workflowById } from "@/lib/catalog";
-import { reviewAsset, setAssetAsReference } from "../actions";
+import { reportDefect, reviewAsset, setAssetAsReference } from "../actions";
 
 export type SheetAsset = {
   id: string;
@@ -111,6 +111,8 @@ function Review({ asset, frameNo, onClose, onPrev, onNext, onChange, personaName
     ["Cost", j?.provider_cost_usd != null ? `$${Number(j.provider_cost_usd).toFixed(3)}` : j?.provider === "comfyui" ? "local" : "–"],
   ];
   if (j?.scene_key) meta.push(["Benchmark scene", j.scene_key]);
+  const qa = (j?.params as { qa?: { verdict: string; reason: string } } | undefined)?.qa;
+  if (qa) meta.push(["Quality check", qa.verdict === "pass" ? "passed" : qa.verdict === "skipped" ? "not run" : qa.reason]);
 
   return (
     <dialog ref={ref} onClose={onClose} className="m-auto max-h-[94dvh] w-[min(1100px,96vw)] overflow-hidden rounded-xl bg-paper p-0 text-ink backdrop:bg-ink/70">
@@ -173,6 +175,21 @@ function Review({ asset, frameNo, onClose, onPrev, onNext, onChange, personaName
             </button>
           )}
           {refMsg && <p className="mt-2 text-sm text-ok">{refMsg}</p>}
+          <details className="mt-3 rounded-lg border border-line p-3 text-sm">
+            <summary className="cursor-pointer font-semibold text-bad">Report a defect</summary>
+            <p className="mt-2 text-muted">Extra limbs, broken hands or a melted face? Report it and the credits for this frame come back.</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {["Extra arms or hands", "Broken fingers", "Distorted face", "Wrong person"].map((r) => (
+                <button key={r} className="btn btn-ghost py-1 text-xs" disabled={pending}
+                  onClick={() => start(async () => {
+                    const res = await reportDefect(asset.id, r);
+                    if (res.ok) onChange({ review_status: "rejected" });
+                    setErr(res.ok ? "" : res.error);
+                    setRefMsg(res.ok ? res.message ?? "" : "");
+                  })}>{r}</button>
+              ))}
+            </div>
+          </details>
           {err && <p className="mt-2 text-sm text-bad">{err}</p>}
 
           <dl className="mt-6 grid grid-cols-2 gap-x-4 gap-y-1 border-t border-line pt-4 text-xs">
