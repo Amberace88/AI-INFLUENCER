@@ -77,7 +77,8 @@ h1, h2, h3 { font-variation-settings: "wdth" 85; letter-spacing: -0.02em; line-h
   position: relative;
 }
 .frame-no {
-  position: absolute; left: 10px; bottom: 6px;
+  position: absolute; left: 10px; right: 10px; bottom: 6px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   color: #e6c86e; font-size: 0.72rem; font-variant-numeric: tabular-nums; letter-spacing: 0.04em;
 }
 
