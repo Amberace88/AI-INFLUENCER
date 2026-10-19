@@ -93,7 +93,7 @@ async function withCredits<T>(kind: string, fn: () => Promise<T>): Promise<{ ok:
 }
 
 export async function createPersonaWithAi(_: ActionResult | null, form: FormData): Promise<ActionResult> {
-  const { supabase } = await requireUser();
+  const { supabase, user } = await requireUser();
   const brief = String(form.get("brief") || "").trim();
   const role = String(form.get("role") || "influencer");
   const language = String(form.get("language") || "es");
@@ -101,8 +101,8 @@ export async function createPersonaWithAi(_: ActionResult | null, form: FormData
   if (brief.length < 15) return { ok: false, error: "Describe the persona in at least one full sentence." };
 
   // check the plan limit before spending credits
-  const { count } = await supabase.from("personas").select("id", { count: "exact", head: true });
-  const { data: me } = await supabase.from("profiles").select("plan:plans(max_personas)").single();
+  const { count } = await supabase.from("personas").select("id", { count: "exact", head: true }).eq("owner_id", user.id);
+  const { data: me } = await supabase.from("profiles").select("plan:plans(max_personas)").eq("id", user.id).single();
   const limit = (me?.plan as unknown as { max_personas: number } | null)?.max_personas ?? 1;
   if ((count ?? 0) >= limit) return { ok: false, error: RPC_ERRORS.persona_limit_reached };
 
@@ -333,4 +333,22 @@ export async function signOut() {
   const { supabase } = await requireUser();
   await supabase.auth.signOut();
   redirect("/login");
+}
+
+// ------------------------------------------------------------------ admin
+export async function adminSetPlan(userId: string, planId: string): Promise<ActionResult> {
+  const { supabase } = await requireUser();
+  const { error } = await supabase.rpc("admin_set_plan", { p_user: userId, p_plan: planId });
+  if (error) return { ok: false, error: error.message.includes("not_admin") ? "Admin only." : error.message };
+  revalidatePath("/app", "layout");
+  return { ok: true, message: "Plan updated." };
+}
+
+export async function adminGrantCredits(userId: string, amount: number, note: string): Promise<ActionResult> {
+  const { supabase } = await requireUser();
+  if (!Number.isInteger(amount) || amount === 0) return { ok: false, error: "Enter a whole number, e.g. 100 or -50." };
+  const { error } = await supabase.rpc("admin_grant_credits", { p_user: userId, p_amount: amount, p_note: note || null });
+  if (error) return { ok: false, error: error.message.includes("not_admin") ? "Admin only." : error.message };
+  revalidatePath("/app", "layout");
+  return { ok: true, message: `${amount > 0 ? "Added" : "Removed"} ${Math.abs(amount)} credits.` };
 }

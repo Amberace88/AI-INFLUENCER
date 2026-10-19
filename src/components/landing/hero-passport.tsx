@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { PersonaArt, type Scene } from "@/components/persona-art";
+import { PersonaPhoto, type PhotoScene } from "@/components/persona-photo";
 
-const SHOTS: { scene: Scene; place: string; caption: string }[] = [
+const SHOTS: { scene: PhotoScene; place: string; caption: string }[] = [
   { scene: "beach", place: "Playa del Albir, 8:10", caption: "Hoy el mar estaba de cristal. Primera clase del día con los peques de Marea: nadie se cayó… bueno, casi nadie 🌊" },
   { scene: "cafe", place: "Café del puerto, 10:30", caption: "Café con leche y la tabla de mareas abierta. ¿Mañana a las 9 o a las 11? Vosotros decidís." },
   { scene: "product", place: "Estudio, 12:00", caption: "Lo que llevo siempre en la mochila: crema solar mineral, factor 50. Tu piel te lo agradecerá en agosto." },
@@ -48,7 +48,7 @@ export function HeroPassport() {
     <div className="rise-3 relative" onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
       <div className="relative grid overflow-hidden rounded-2xl bg-paper shadow-[0_30px_80px_-30px_rgba(23,32,43,.45)] ring-1 ring-line sm:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)]">
         <div className="relative bg-ink p-3 pb-9">
-          <PersonaArt key={shot.scene} scene={shot.scene} look="lucia" className="developing block aspect-[2/3] w-full rounded-[3px]" title={`Lucía, ${shot.place}`} />
+          <PersonaPhoto key={shot.scene} scene={shot.scene} look="lucia" priority={i === 0} sizes="(min-width: 1024px) 280px, 50vw" className="developing w-full rounded-[3px]" alt={`Lucía, AI persona, ${shot.place}`} />
           <span className="absolute bottom-3 left-3 text-xs tabular-nums safelight">{String(i + 1).padStart(2, "0")}A · {shot.place}</span>
           <span key={`k${i}`} className="stamp stamp-in text-ok">KEEP</span>
         </div>

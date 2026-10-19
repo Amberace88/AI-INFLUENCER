@@ -8,7 +8,7 @@ export type AuthState = { error?: string; message?: string } | null;
 
 function safeNext(v: FormDataEntryValue | null) {
   const s = String(v || "");
-  return s.startsWith("/app") ? s : "/app/studio";
+  return s.startsWith("/app") ? s : "/app/home";
 }
 
 export async function signIn(_: AuthState, form: FormData): Promise<AuthState> {

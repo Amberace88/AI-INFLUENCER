@@ -7,10 +7,10 @@ import { AiPersonaForm } from "./ai-persona-form";
 export default async function NewPersonaPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const sp = await searchParams;
   const manual = sp.mode === "manual";
-  const { supabase } = await requireUser();
+  const { supabase, user } = await requireUser();
   const [{ count }, { data: me }, { data: cost }] = await Promise.all([
-    supabase.from("personas").select("id", { count: "exact", head: true }),
-    supabase.from("profiles").select("plan:plans(name, max_personas)").single(),
+    supabase.from("personas").select("id", { count: "exact", head: true }).eq("owner_id", user.id),
+    supabase.from("profiles").select("plan:plans(name, max_personas)").eq("id", user.id).single(),
     supabase.from("generation_costs").select("credits").eq("kind", "text_persona").maybeSingle(),
   ]);
   const plan = me?.plan as unknown as { name: string; max_personas: number } | null;

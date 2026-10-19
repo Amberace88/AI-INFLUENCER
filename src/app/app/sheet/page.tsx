@@ -11,12 +11,13 @@ const FILTERS = [
 
 export default async function SheetPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const sp = await searchParams;
-  const { supabase } = await requireUser();
-  const { data: personas } = await supabase.from("personas").select("id, name").order("name");
+  const { supabase, user } = await requireUser();
+  const { data: personas } = await supabase.from("personas").select("id, name").eq("owner_id", user.id).order("name");
 
   let q = supabase
     .from("assets")
     .select("id, storage_path, width, height, review_status, scores, notes, created_at, persona_id, job:jobs(id, prompt, negative_prompt, workflow, provider, params, duration_ms, attempts, provider_cost_usd, scene_key, benchmark_run_id)")
+    .eq("owner_id", user.id)
     .order("created_at", { ascending: false })
     .limit(120);
   if (sp.status) q = q.eq("review_status", sp.status);

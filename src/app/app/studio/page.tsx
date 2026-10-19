@@ -7,12 +7,13 @@ export default async function StudioPage({ searchParams }: { searchParams: Promi
   const sp = await searchParams;
   const { supabase, user } = await requireUser();
   const [{ data: personas }, { data: refs }, { data: costs }, { data: jobs }] = await Promise.all([
-    supabase.from("personas").select("*").order("created_at", { ascending: false }),
+    supabase.from("personas").select("*").eq("owner_id", user.id).order("created_at", { ascending: false }),
     supabase.from("persona_references").select("persona_id"),
     supabase.from("generation_costs").select("kind, credits"),
     supabase
       .from("jobs")
       .select("id, status, progress, prompt, workflow, provider, params, error, attempts, queued_at, started_at, finished_at, duration_ms, persona_id")
+      .eq("owner_id", user.id)
       .order("queued_at", { ascending: false })
       .limit(24),
   ]);

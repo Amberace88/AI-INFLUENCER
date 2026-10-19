@@ -14,13 +14,13 @@ function pct(sorted: number[], p: number) {
 const secs = (ms: number | null) => (ms == null ? "–" : `${(ms / 1000).toFixed(1)} s`);
 
 export default async function JobsPage() {
-  const { supabase } = await requireUser();
+  const { supabase, user } = await requireUser();
   const since = new Date(Date.now() - 30 * 864e5).toISOString();
   const [{ data: jobs }, { data: assets }] = await Promise.all([
     supabase.from("jobs")
       .select("id, status, workflow, provider, attempts, duration_ms, provider_cost_usd, error, queued_at, started_at, credits_charged, credits_refunded")
-      .gte("queued_at", since).order("queued_at", { ascending: false }).limit(2000),
-    supabase.from("assets").select("job_id, review_status").gte("created_at", since).limit(5000),
+      .eq("owner_id", user.id).gte("queued_at", since).order("queued_at", { ascending: false }).limit(2000),
+    supabase.from("assets").select("job_id, review_status").eq("owner_id", user.id).gte("created_at", since).limit(5000),
   ]);
   const rows = (jobs ?? []) as Row[];
   const reviewByJob = new Map((assets ?? []).map((a) => [a.job_id, a.review_status]));

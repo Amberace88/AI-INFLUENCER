@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { PersonaArt, type Look, type Scene } from "@/components/persona-art";
+import { PersonaPhoto, type PhotoLook, type PhotoScene } from "@/components/persona-photo";
 import { HeroPassport } from "@/components/landing/hero-passport";
 import { RolesShowcase } from "@/components/landing/roles-showcase";
 import { Pricing } from "@/components/landing/pricing";
@@ -7,24 +7,26 @@ import { SiteHeader } from "@/components/landing/site-header";
 import { Logo } from "@/components/logo";
 import { createClient, supabaseConfigured } from "@/lib/supabase/server";
 
-const STRIP: { scene: Scene; look: Look; label: string }[] = [
+const STRIP: { scene: PhotoScene; look: PhotoLook; label: string }[] = [
   { scene: "beach", look: "lucia", label: "Lucía · Albir" },
-  { scene: "office", look: "marco", label: "Marco · press note" },
+  { scene: "office", look: "marco", label: "Marco · site visit" },
   { scene: "street", look: "noa", label: "Noa · Valencia" },
   { scene: "cafe", look: "lucia", label: "Lucía · morning" },
   { scene: "gym", look: "marco", label: "Marco · week 6" },
   { scene: "product", look: "noa", label: "Noa · SPF tip" },
   { scene: "night", look: "lucia", label: "Lucía · season end" },
   { scene: "studio", look: "marco", label: "Marco · profile" },
+  { scene: "studio", look: "noa", label: "Noa · profile" },
+  { scene: "gym", look: "lucia", label: "Lucía · warm-up" },
 ];
 
-const SHEET: { scene: Scene; keep: boolean; score: number }[] = [
+const SHEET: { scene: PhotoScene; keep: boolean; score: number }[] = [
   { scene: "studio", keep: true, score: 4.8 },
   { scene: "beach", keep: true, score: 4.6 },
-  { scene: "night", keep: false, score: 2.9 },
+  { scene: "night", keep: false, score: 3.2 },
   { scene: "cafe", keep: true, score: 4.5 },
   { scene: "gym", keep: true, score: 4.4 },
-  { scene: "street", keep: false, score: 3.1 },
+  { scene: "product", keep: true, score: 4.7 },
 ];
 
 const FAQ = [
@@ -74,7 +76,7 @@ export default async function Home() {
             <div className="marquee flex shrink-0 gap-3 pr-3">
               {[...STRIP, ...STRIP].map((s, n) => (
                 <figure key={n} className="w-[150px] shrink-0 sm:w-[170px]" aria-hidden={n >= STRIP.length}>
-                  <PersonaArt scene={s.scene} look={s.look} className="block aspect-[2/3] w-full rounded-[3px]" title={s.label} />
+                  <PersonaPhoto scene={s.scene} look={s.look} sizes="170px" className="w-full rounded-[3px]" alt={`${s.label}, AI persona`} />
                   <figcaption className="mt-1.5 text-xs tabular-nums safelight">{String((n % STRIP.length) + 1).padStart(2, "0")}A · {s.label}</figcaption>
                 </figure>
               ))}
@@ -113,8 +115,8 @@ export default async function Home() {
                 <h3 className="mt-3 text-2xl font-bold">Let them write and pose</h3>
                 <p className="mt-2 text-muted">Ask for five Instagram posts about summer lessons. Each comes with a photo idea; one click shoots it with the same face.</p>
                 <div className="mt-5 grid grid-cols-3 gap-2">
-                  {(["beach", "cafe", "product"] as Scene[]).map((s) => (
-                    <PersonaArt key={s} scene={s} look="lucia" className="block aspect-[2/3] w-full rounded-md" />
+                  {(["beach", "cafe", "product"] as PhotoScene[]).map((s) => (
+                    <PersonaPhoto key={s} scene={s} look="lucia" sizes="120px" className="w-full rounded-md" alt={`Lucía, ${s} scene`} />
                   ))}
                 </div>
               </li>
@@ -149,7 +151,7 @@ export default async function Home() {
             <ul className="grid grid-cols-3 gap-3">
               {SHEET.map((f, n) => (
                 <li key={f.scene} className="frame relative" style={{ background: "#0e141c" }}>
-                  <PersonaArt scene={f.scene} look="lucia" className={`block aspect-[2/3] w-full rounded-[2px] ${f.keep ? "" : "opacity-40 grayscale"}`} />
+                  <PersonaPhoto scene={f.scene} look="lucia" sizes="200px" className={`w-full rounded-[2px] ${f.keep ? "" : "opacity-40 grayscale"}`} alt={`Lucía, ${f.scene} frame, score ${f.score}`} />
                   <span className="frame-no">{String(n + 1).padStart(3, "0")} · {f.score.toFixed(1)}</span>
                   <span className={`stamp ${f.keep ? "text-ok" : "text-bad"}`}>{f.keep ? "KEEP" : "NO"}</span>
                 </li>
@@ -200,8 +202,8 @@ export default async function Home() {
           <div className="max-w-md">
             <Logo />
             <p className="mt-3">
-              All personas are fictional and AI-generated. Generated images can contain mistakes in hands, text and products;
-              review before publishing.
+              All personas are fictional and AI-generated, including every person shown on this page. Generated images can
+              contain mistakes in hands, text and products; review before publishing.
             </p>
           </div>
           <nav className="flex gap-6" aria-label="Footer">

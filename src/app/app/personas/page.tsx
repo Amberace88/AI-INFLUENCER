@@ -1,12 +1,16 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/supabase/server";
 import type { Persona } from "@/lib/catalog";
+import { PersonaArt, type Look } from "@/components/persona-art";
+
+const LOOKS: Look[] = ["lucia", "marco", "noa"];
+const lookFor = (id: string) => LOOKS[id.charCodeAt(0) % LOOKS.length];
 
 export default async function PersonasPage() {
-  const { supabase } = await requireUser();
-  const { data: personas } = await supabase.from("personas").select("*").order("created_at", { ascending: false });
+  const { supabase, user } = await requireUser();
+  const { data: personas } = await supabase.from("personas").select("*").eq("owner_id", user.id).order("created_at", { ascending: false });
   const { data: refs } = await supabase.from("persona_references").select("persona_id, storage_path").eq("is_primary", true);
-  const { data: counts } = await supabase.from("assets").select("persona_id, review_status");
+  const { data: counts } = await supabase.from("assets").select("persona_id, review_status").eq("owner_id", user.id);
 
   const paths = (refs ?? []).map((r) => r.storage_path);
   const signed = paths.length ? (await supabase.storage.from("references").createSignedUrls(paths, 3600)).data ?? [] : [];
@@ -45,7 +49,10 @@ export default async function PersonasPage() {
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={img} alt="" className="h-full w-full object-cover" />
                     ) : (
-                      <span className="grid h-full place-items-center px-2 text-center text-xs text-muted">No reference yet</span>
+                      <span className="relative block h-full">
+                        <PersonaArt look={lookFor(p.id)} scene="studio" className="h-full w-full opacity-60 grayscale" title="No photo yet" />
+                        <span className="absolute inset-x-0 bottom-0 bg-ink/70 py-1 text-center text-[10px] text-paper">No photo yet</span>
+                      </span>
                     )}
                   </div>
                   <div className="min-w-0 py-1">

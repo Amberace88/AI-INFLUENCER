@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { PersonaArt, type Look, type Scene } from "@/components/persona-art";
+import { PersonaPhoto, type PhotoLook, type PhotoScene } from "@/components/persona-photo";
 
-const ROLES: { id: string; label: string; who: string; look: Look; scene: Scene; lang: string; platform: string; post: string; use: string }[] = [
+const ROLES: { id: string; label: string; who: string; look: PhotoLook; scene: PhotoScene; lang: string; platform: string; post: string; use: string }[] = [
   {
     id: "ambassador", label: "Brand ambassador", who: "Lucía, for a surf school", look: "lucia", scene: "beach", lang: "ES", platform: "Instagram",
     post: "Tres cosas que nadie te cuenta de tu primera clase de surf: vas a beber agua salada, te vas a reír mucho y vas a querer volver mañana. Reserva en el enlace de la bio.",
@@ -57,7 +57,7 @@ export function RolesShowcase() {
 
       <div id="role-panel" role="tabpanel" key={r.id} className="panel-in grid gap-5 rounded-2xl bg-paper p-4 ring-1 ring-line sm:grid-cols-[180px_1fr] sm:p-5">
         <div className="frame">
-          <PersonaArt scene={r.scene} look={r.look} className="developing block aspect-[2/3] w-full rounded-[2px]" title={r.who} />
+          <PersonaPhoto scene={r.scene} look={r.look} sizes="180px" className="developing w-full rounded-[2px]" alt={`${r.who}, AI persona`} />
           <span className="frame-no">{r.platform} · {r.lang}</span>
         </div>
         <div className="flex flex-col">

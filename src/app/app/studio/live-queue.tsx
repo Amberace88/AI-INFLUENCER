@@ -70,7 +70,7 @@ export function LiveQueue({ userId, initial, personaNames }: { userId: string; i
   useEffect(() => {
     const supabase = createClient();
     const refresh = async () => {
-      const { data } = await supabase.from("jobs").select(COLUMNS).order("queued_at", { ascending: false }).limit(40);
+      const { data } = await supabase.from("jobs").select(COLUMNS).eq("owner_id", userId).order("queued_at", { ascending: false }).limit(40);
       if (!data) return;
       const done: string[] = [];
       for (const j of data as QueueJob[]) {
