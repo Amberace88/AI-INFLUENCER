@@ -30,19 +30,18 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           {/* Credits counter: like the frame counter on a camera */}
           <Link href="/app/billing" title="Plan & credits"
             className="group block rounded-xl text-sm md:mt-7 md:bg-white/[.05] md:p-3.5 md:ring-1 md:ring-white/10 md:transition-colors md:hover:bg-white/[.08]">
-            <div className="flex items-baseline gap-1.5">
+            <div className="relative flex items-baseline gap-1.5">
               <span className={`condensed text-2xl font-bold tabular-nums md:text-[1.9rem] ${low ? "text-safelight" : "text-paper"}`}>{balance}</span>
               <span className="text-[#9eabb9]">credits</span>
+              {isAdmin && <span className="absolute right-0 top-1 hidden rounded bg-safelight px-1.5 py-px text-[10px] font-bold text-ink md:inline">Admin</span>}
             </div>
             <div className="meter mt-2.5 hidden h-1 overflow-hidden rounded-full bg-white/10 md:block" role="meter" aria-valuemin={0} aria-valuemax={cap} aria-valuenow={balance} aria-label="Credits left">
               <span className={`block h-full rounded-full ${low ? "bg-safelight" : "bg-[#6f86ff]"}`} style={{ width: `${Math.min(100, (balance / cap) * 100)}%` }} />
             </div>
             {plan && (
-              <p className="mt-2.5 hidden items-center gap-1.5 text-xs text-[#9eabb9] md:flex">
-                <span>{plan.name}</span>
-                <span aria-hidden className="h-3 w-px bg-white/15" />
+              <p className="mt-2.5 hidden items-center justify-between gap-2 whitespace-nowrap text-xs text-[#9eabb9] md:flex">
+                <span>{plan.name} plan</span>
                 <span className="tabular-nums">{personaCount ?? 0}/{plan.max_personas} personas</span>
-                {isAdmin && <span className="ml-auto rounded bg-safelight px-1.5 py-px text-[10px] font-bold text-ink">Admin</span>}
               </p>
             )}
             {low && <p className="mt-2 hidden text-xs text-safelight md:block">Running low. Top up or change plan.</p>}

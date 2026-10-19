@@ -137,13 +137,13 @@ function PostCard({ post, personaId, who, onChange, onRemove }: { post: Post; pe
         </span>
         <span className="min-w-0 leading-tight">
           <span className="block truncate font-semibold">{who.name}</span>
-          <span className="block truncate text-xs capitalize text-muted">@{who.handle} on {post.platform}</span>
+          <span className="block truncate text-xs text-muted">@{who.handle} on {post.platform.charAt(0).toUpperCase() + post.platform.slice(1)}</span>
         </span>
         <span className={`ml-auto rounded-full px-2.5 py-0.5 text-xs font-semibold ${statusTone}`}>{STATUS_LABEL[post.status]}</span>
       </header>
 
       {post.image_idea && (
-        <div className="mx-4 mt-4 grid aspect-[4/3] place-items-center rounded-xl border-2 border-dashed border-line bg-backdrop/60 p-5 text-center">
+        <div className="mx-4 mt-4 grid place-items-center rounded-xl border-2 border-dashed border-line bg-backdrop/60 px-5 py-7 text-center">
           <div>
             <p className="text-xs text-muted">Photo for this post</p>
             <p className="mx-auto mt-1 max-w-[38ch] text-sm leading-relaxed">{post.image_idea}</p>

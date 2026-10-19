@@ -8,7 +8,7 @@ export default async function StudioPage({ searchParams }: { searchParams: Promi
   const { supabase, user } = await requireUser();
   const [{ data: personas }, { data: refs }, { data: costs }, { data: jobs }] = await Promise.all([
     supabase.from("personas").select("*").eq("owner_id", user.id).order("created_at", { ascending: false }),
-    supabase.from("persona_references").select("persona_id"),
+    supabase.from("persona_references").select("persona_id, storage_path, is_primary"),
     supabase.from("generation_costs").select("kind, credits"),
     supabase
       .from("jobs")
@@ -18,14 +18,23 @@ export default async function StudioPage({ searchParams }: { searchParams: Promi
       .limit(24),
   ]);
 
-  const withRefs = new Set((refs ?? []).map((r) => r.persona_id));
+  const mine = new Set((personas ?? []).map((p) => p.id));
+  const ownRefs = (refs ?? []).filter((r) => mine.has(r.persona_id));
+  const withRefs = new Set(ownRefs.map((r) => r.persona_id));
+  const primaries = ownRefs.filter((r) => r.is_primary);
+  const signed = primaries.length ? (await supabase.storage.from("references").createSignedUrls(primaries.map((r) => r.storage_path), 3600)).data ?? [] : [];
+  const avatars = Object.fromEntries(primaries.map((r, i) => [r.persona_id, signed[i]?.signedUrl ?? ""]));
   const costMap = Object.fromEntries((costs ?? []).map((c) => [c.kind, c.credits]));
 
   return (
-    <div className="grid gap-10 xl:grid-cols-[minmax(0,1fr)_420px]">
-      <section>
-        <h1 className="mb-6 text-4xl font-bold">Studio</h1>
+    <div className="grid gap-10 xl:grid-cols-[minmax(0,1fr)_400px]">
+      <section className="min-w-0">
+        <header className="mb-8">
+          <h1 className="condensed text-[clamp(2.4rem,5vw,3.6rem)] font-extrabold">Studio</h1>
+          <p className="mt-1 max-w-[60ch] text-muted">Describe the scene and the frames develop on the monitor. Failed or rejected shots cost nothing.</p>
+        </header>
         <GenerateForm
+          avatars={avatars}
           personas={(personas ?? []) as Persona[]}
           personasWithRefs={[...withRefs]}
           costs={costMap}
@@ -33,8 +42,7 @@ export default async function StudioPage({ searchParams }: { searchParams: Promi
           initialScene={sp.scene ?? ""}
         />
       </section>
-      <aside>
-        <h2 className="mb-4 text-2xl font-bold">On set</h2>
+      <aside className="xl:sticky xl:top-6 xl:self-start">
         <LiveQueue userId={user.id} initial={(jobs ?? []) as QueueJob[]} personaNames={Object.fromEntries((personas ?? []).map((p) => [p.id, p.name]))} />
       </aside>
     </div>
