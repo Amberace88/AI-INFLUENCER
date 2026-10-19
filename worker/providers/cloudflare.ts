@@ -1,5 +1,7 @@
+import { createHash } from "node:crypto";
 import sharp from "sharp";
 import { config } from "../config";
+import { Box, locateFace, qaEnabled } from "../qa";
 import { imageSize } from "../image-size";
 import { Job, PermanentError, Provider, ProviderResult, RunContext } from "../types";
 
@@ -38,7 +40,38 @@ export async function shrinkReference(data: Buffer): Promise<{ data: Buffer; wid
   return { data: out.data, width: out.info.width, height: out.info.height };
 }
 
-const clampSize = (v: number | undefined, d: number) => Math.min(1920, Math.max(256, Math.round((v ?? d) / 16) * 16));
+/**
+ * Head-and-shoulders crop of a reference. Sending the whole photo makes FLUX.2 copy its room;
+ * sending only the face keeps identity while the scene comes from the prompt.
+ */
+const cropCache = new Map<string, Buffer>();
+export async function faceCrop(data: Buffer, log: (m: string) => void = () => {}): Promise<Buffer> {
+  const key = createHash("sha1").update(data).digest("hex");
+  const hit = cropCache.get(key);
+  if (hit) return hit;
+  const upright = await sharp(data).rotate().toBuffer();
+  const { width: W = 0, height: H = 0 } = await sharp(upright).metadata();
+  if (!W || !H) return data;
+
+  let box: Box | null = null;
+  if (qaEnabled()) {
+    try { box = await locateFace(upright); } catch (e) { log(`face locate failed, using centre crop (${(e as Error).message.slice(0, 80)})`); }
+  }
+  // fallback: portraits have the head in the upper-middle
+  const b = box ?? { x0: 0.32, y0: 0.06, x1: 0.68, y1: 0.36 };
+  const fw = (b.x1 - b.x0) * W, fh = (b.y1 - b.y0) * H;
+  const side = Math.min(W, H, Math.round(Math.max(fw, fh) * 1.9));
+  const cx = ((b.x0 + b.x1) / 2) * W, cy = ((b.y0 + b.y1) / 2) * H + fh * 0.12; // a bit lower: hair + neck
+  const left = Math.round(Math.min(Math.max(0, cx - side / 2), W - side));
+  const top = Math.round(Math.min(Math.max(0, cy - side / 2), H - side));
+  const out = await sharp(upright).extract({ left, top, width: side, height: side }).jpeg({ quality: 92 }).toBuffer();
+  log(`reference face crop ${side}×${side} at ${left},${top}${box ? "" : " (centre fallback)"}`);
+  if (cropCache.size > 200) cropCache.clear();
+  cropCache.set(key, out);
+  return out;
+}
+
+const clampSize =(v: number | undefined, d: number) => Math.min(1920, Math.max(256, Math.round((v ?? d) / 16) * 16));
 
 async function call(model: string, init: RequestInit) {
   const { accountId, token, apiBase } = config.cloudflare;
@@ -102,16 +135,17 @@ export const cloudflareProvider: Provider = {
     const form = new FormData();
     let inputMp = 0;
     for (const [i, r] of refs.entries()) {
-      const small = await shrinkReference(r.data);
+      const small = await shrinkReference(await faceCrop(r.data, ctx.log));
       inputMp += (small.width * small.height) / 1_000_000;
       form.append(`input_image_${i}`, new Blob([new Uint8Array(small.data)], { type: "image/jpeg" }), `ref${i}.jpg`);
     }
     const imgs = refs.length === 1 ? "image 0" : `images 0-${refs.length - 1}`;
     const avoid = job.negative_prompt ? ` Avoid: ${job.negative_prompt}.` : "";
     const prompt = refs.length
-      ? `A completely new photograph of the person shown in ${imgs}. Scene: ${job.prompt}. ` +
-        `Use ${imgs} ONLY to keep the person's identity: same face, facial features, skin tone, hair and distinctive marks. ` +
-        `Do NOT copy the background, room, clothing, pose, framing or lighting of ${imgs}; follow the scene description for all of those.${avoid}`
+      ? `${job.prompt}. ` +
+        `The person in this photo is the person whose face is shown in ${imgs} (a close-up face crop). ` +
+        `Keep exactly that identity: same face, facial features, skin tone, hair and distinctive marks. ` +
+        `Build the whole background, location, clothing, pose, framing and lighting from the scene description above, not from ${imgs}.${avoid}`
       : `${job.prompt}.${avoid}`;
     form.append("prompt", prompt.slice(0, 2048));
     form.append("width", String(width));

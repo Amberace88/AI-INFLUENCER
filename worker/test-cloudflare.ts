@@ -7,6 +7,7 @@ async function main() {
   const PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
   let lastBody: Record<string, unknown> = {};
   let lastAuth = "";
+  let faceCalls = 0;
   let lastForm: { contentType: string; fields: string[]; prompt: string } = { contentType: "", fields: [], prompt: "" };
   const server = createServer(async (req, res) => {
     const chunks: Buffer[] = [];
@@ -14,6 +15,10 @@ async function main() {
     lastAuth = String(req.headers.authorization);
     const json = (o: unknown, s = 200) => { res.writeHead(s, { "content-type": "application/json" }); res.end(JSON.stringify(o)); };
     if (req.url?.includes("/ai/models/search")) return json({ success: true, result: [] });
+    if (req.url?.endsWith("/ai/v1/chat/completions")) {
+      faceCalls++;
+      return json({ choices: [{ message: { content: 'Here: {"x0": 400, "y0": 100, "x1": 600, "y1": 300}' } }] });
+    }
     if (req.url?.endsWith("/ai/run/@cf/black-forest-labs/flux-2-klein-9b")) {
       const raw = Buffer.concat(chunks).toString("latin1");
       lastForm = {
@@ -70,8 +75,18 @@ async function main() {
   const k = await cloudflareProvider.run({ ...job, workflow: "cf_klein_ref", params: { width: 832, height: 1248, seed: 7 } }, { references: refs, onProgress: () => {}, log: () => {} });
   assert.match(lastForm.contentType, /multipart\/form-data/);
   assert.deepEqual(lastForm.fields.sort(), ["height", "input_image_0", "input_image_1", "prompt", "seed", "width"]);
-  assert.match(lastForm.prompt, /person shown in images 0-1/);
-  assert.match(lastForm.prompt, /Do NOT copy the background/);
+  assert.match(lastForm.prompt, /^portrait of Luc\S+a\. The person/, "scene comes first");
+  assert.match(lastForm.prompt, /face is shown in images 0-1/);
+  assert.match(lastForm.prompt, /not from images 0-1/);
+  assert.equal(faceCalls, 1, "face located once, second identical reference served from cache");
+  const { faceCrop } = await import("./providers/cloudflare");
+  const { parseBox } = await import("./qa");
+  const crop = await sharp(await faceCrop(big)).metadata();
+  assert.equal(crop.width, crop.height, "face crop is square");
+  assert.ok((crop.width ?? 0) < 1200, `face crop smaller than the photo (${crop.width})`);
+  assert.equal(parseBox('{"x0": 10, "y0": 10, "x1": 5, "y1": 900}'), null, "bad box rejected");
+  assert.equal(parseBox("no face"), null);
+  console.log("✓ reference face crop");
   assert.ok((k.costUsd ?? 0) > 0.014 && (k.costUsd ?? 1) < 0.02, `klein cost ${k.costUsd}`);
   await assert.rejects(cloudflareProvider.run({ ...job, workflow: "cf_klein_ref" }, { references: [], onProgress: () => {}, log: () => {} }), PermanentError);
   console.log("✓ cloudflare klein with references");

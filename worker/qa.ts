@@ -68,6 +68,33 @@ export function judge(raw: string): QaResult {
     : { verdict: "pass", reason: "ok", people, hands, arms };
 }
 
+export type Box = { x0: number; y0: number; x1: number; y1: number }; // 0..1 of image size
+
+/** Parses {"x0":..,"y0":..,"x1":..,"y1":..} in 0–1000 units; null if missing or nonsense. */
+export function parseBox(raw: string): Box | null {
+  const m = raw.match(/\{[\s\S]*?\}/);
+  if (!m) return null;
+  try {
+    const j = JSON.parse(m[0]);
+    const v = ["x0", "y0", "x1", "y1"].map((k) => Number(j[k]) / 1000);
+    if (v.some((n) => !Number.isFinite(n) || n < 0 || n > 1)) return null;
+    const [x0, y0, x1, y1] = v;
+    if (x1 - x0 < 0.03 || y1 - y0 < 0.03) return null;
+    return { x0, y0, x1, y1 };
+  } catch { return null; }
+}
+
+/** Finds the main face so we can give the image model a face crop instead of the whole room. */
+export async function locateFace(image: Buffer): Promise<Box | null> {
+  const small = await sharp(image).rotate().resize(768, 768, { fit: "inside" }).jpeg({ quality: 85 }).toBuffer();
+  const raw = await ask(
+    `Find the main person's face (forehead to chin, ear to ear). Reply with ONE JSON object only: ` +
+      `{"x0": left, "y0": top, "x1": right, "y1": bottom} as integers from 0 to 1000 relative to the image width and height.`,
+    `data:image/jpeg;base64,${small.toString("base64")}`,
+  );
+  return parseBox(raw);
+}
+
 export async function inspect(image: Buffer): Promise<QaResult> {
   const small = await sharp(image).resize(768, 768, { fit: "inside" }).jpeg({ quality: 85 }).toBuffer();
   const raw = await ask(PROMPT, `data:image/jpeg;base64,${small.toString("base64")}`);
