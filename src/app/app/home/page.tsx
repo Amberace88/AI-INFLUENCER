@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireUser } from "@/lib/supabase/server";
 import { Icon, type IconName } from "@/components/icons";
 import { PersonaArt, type Look } from "@/components/persona-art";
+import { ROLES } from "@/lib/catalog";
 
 const LOOKS: Look[] = ["lucia", "marco", "noa"];
 
@@ -19,6 +20,10 @@ export default async function HomePage() {
     supabase.from("posts").select("id, caption, platform, persona_id, status").eq("owner_id", user.id).order("created_at", { ascending: false }).limit(3),
     supabase.from("credit_balances").select("balance").eq("owner_id", user.id).maybeSingle(),
     supabase.from("jobs").select("id", { count: "exact", head: true }).eq("owner_id", user.id).in("status", ["queued", "running"]),
+  ]);
+  const [{ count: toReview }, { count: drafts }] = await Promise.all([
+    supabase.from("assets").select("id", { count: "exact", head: true }).eq("owner_id", user.id).eq("review_status", "pending"),
+    supabase.from("posts").select("id", { count: "exact", head: true }).eq("owner_id", user.id).eq("status", "draft"),
   ]);
   const plan = me?.plan as unknown as { name: string; monthly_credits: number; max_personas: number } | null;
   const { data: refs } = personas?.length
@@ -43,7 +48,7 @@ export default async function HomePage() {
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-muted">{greeting()}{first ? `, ${first}` : ""}</p>
-          <h1 className="mt-1 text-[clamp(2.2rem,4.5vw,3.4rem)] font-extrabold">
+          <h1 className="condensed mt-1 text-[clamp(2.4rem,5vw,3.8rem)] font-extrabold">
             {personas?.length ? "Who's working for you today?" : "Let's cast your first persona."}
           </h1>
         </div>
@@ -53,6 +58,27 @@ export default async function HomePage() {
           <div><dt className="text-muted">On set</dt><dd className="text-2xl font-bold tabular-nums">{openJobs ?? 0}</dd></div>
         </dl>
       </header>
+
+      {((toReview ?? 0) > 0 || (drafts ?? 0) > 0 || (openJobs ?? 0) > 0 || !firstPersona) && (
+        <section aria-label="Waiting for you" className="flex flex-wrap gap-2">
+          {(openJobs ?? 0) > 0 && (
+            <Link href="/app/studio" className="flex items-center gap-2 rounded-full bg-ink px-4 py-2 text-sm text-paper">
+              <span className="size-2 animate-pulse rounded-full bg-safelight shadow-[0_0_8px_var(--safelight)]" aria-hidden />
+              {openJobs} on set now
+            </Link>
+          )}
+          {(toReview ?? 0) > 0 && (
+            <Link href="/app/sheet?status=pending" className="rounded-full bg-paper px-4 py-2 text-sm ring-1 ring-line hover:ring-ink">
+              <b className="tabular-nums">{toReview}</b> frame{toReview === 1 ? "" : "s"} to review
+            </Link>
+          )}
+          {(drafts ?? 0) > 0 && firstPersona && (
+            <Link href={`/app/personas/${firstPersona.id}/posts`} className="rounded-full bg-paper px-4 py-2 text-sm ring-1 ring-line hover:ring-ink">
+              <b className="tabular-nums">{drafts}</b> draft post{drafts === 1 ? "" : "s"} to approve
+            </Link>
+          )}
+        </section>
+      )}
 
       <section aria-label="Quick actions" className="grid gap-3 md:grid-cols-3">
         {actions.map((a, i) => (
@@ -85,9 +111,9 @@ export default async function HomePage() {
                       ) : (
                         <PersonaArt look={LOOKS[i % 3]} scene="studio" className="block aspect-[2/3] w-full rounded-[2px] opacity-70 grayscale" title="No photo yet" />
                       )}
-                      <span className="frame-no">{String(i + 1).padStart(2, "0")} · {p.role}</span>
+                      <span className="frame-no">{String(i + 1).padStart(2, "0")} · {ROLES.find((r) => r.id === p.role)?.label ?? "Influencer"}</span>
                     </div>
-                    <p className="mt-2 truncate font-semibold">{p.name}</p>
+                    <p className="condensed mt-3 truncate text-lg font-bold group-hover:text-accent">{p.name}</p>
                     {p.tagline && <p className="line-clamp-2 text-xs text-muted">{p.tagline}</p>}
                   </Link>
                 </li>
@@ -119,12 +145,14 @@ export default async function HomePage() {
             <Link href="/app/sheet" className="text-sm text-muted hover:text-ink">Contact sheet</Link>
           </div>
           {assets?.length ? (
-            <ul className="mt-5 grid grid-cols-4 gap-2">
+            <ul className="sheet mt-5 grid grid-cols-3 gap-2 rounded-[18px] px-3 py-8 sm:grid-cols-4">
               {assets.map((a, i) => (
-                <li key={a.id} className="frame relative">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={signedAssets[i]?.signedUrl ?? undefined} alt="" className="aspect-[2/3] w-full rounded-[2px] object-cover" />
-                  <span className="frame-no truncate pr-2">{names.get(a.persona_id ?? "") ?? ""}</span>
+                <li key={a.id}>
+                  <Link href="/app/sheet" className="frame block transition-transform hover:-translate-y-0.5">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={signedAssets[i]?.signedUrl ?? undefined} alt="" className="aspect-[2/3] w-full rounded-[2px] object-cover" />
+                    <span className="frame-no truncate pr-2">{names.get(a.persona_id ?? "")?.split(" ")[0] ?? ""}</span>
+                  </Link>
                 </li>
               ))}
             </ul>
@@ -138,9 +166,21 @@ export default async function HomePage() {
             <ul className="mt-5 space-y-3">
               {posts.map((p) => (
                 <li key={p.id}>
-                  <Link href={`/app/personas/${p.persona_id}/posts`} className="block rounded-xl bg-paper p-4 ring-1 ring-line hover:ring-ink">
-                    <p className="text-xs text-muted"><span className="font-semibold capitalize text-ink">{names.get(p.persona_id) ?? "Persona"}</span> · {p.platform} · {p.status}</p>
-                    <p className="mt-1 line-clamp-3 text-sm">{p.caption}</p>
+                  <Link href={`/app/personas/${p.persona_id}/posts`} className="post-preview block rounded-2xl bg-paper p-4 transition-transform hover:-translate-y-0.5">
+                    <div className="flex items-center gap-2.5">
+                      <span className="size-8 shrink-0 overflow-hidden rounded-full bg-backdrop">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        {refUrl.get(p.persona_id) ? <img src={refUrl.get(p.persona_id) ?? undefined} alt="" className="h-full w-full object-cover object-top" /> : null}
+                      </span>
+                      <span className="min-w-0 flex-1 leading-tight">
+                        <span className="block truncate text-sm font-semibold">{names.get(p.persona_id) ?? "Persona"}</span>
+                        <span className="block text-xs text-muted">{p.platform.charAt(0).toUpperCase() + p.platform.slice(1)}</span>
+                      </span>
+                      <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${p.status === "approved" ? "bg-ok/12 text-ok" : p.status === "published" ? "bg-accent/12 text-accent" : "bg-backdrop text-muted"}`}>
+                        {p.status === "draft" ? "Draft" : p.status === "approved" ? "Approved" : "Published"}
+                      </span>
+                    </div>
+                    <p className="mt-3 line-clamp-3 text-sm leading-relaxed">{p.caption}</p>
                   </Link>
                 </li>
               ))}

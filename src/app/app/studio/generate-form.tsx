@@ -66,7 +66,7 @@ export function GenerateForm({
         <input type="radio" name="workflow" value={w.id} checked={w.id === workflowId} onChange={() => setWorkflowId(w.id)} className="sr-only" />
         <span className="flex items-baseline justify-between gap-2">
           <span className="font-semibold">{w.label}</span>
-          <span className="text-xs tabular-nums text-muted">{costs[w.kind] ?? "?"} cr</span>
+          <span className="whitespace-nowrap text-xs tabular-nums text-muted">{costs[w.kind] ?? "?"} cr</span>
         </span>
         <span className="mt-1 block text-sm text-muted">{w.hint}</span>
         {blocked && <span className="mt-1 block text-xs text-warn">Needs a reference photo</span>}

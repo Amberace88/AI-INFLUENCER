@@ -61,7 +61,7 @@ export default async function JobsPage() {
 
   return (
     <div className="max-w-6xl">
-      <h1 className="text-4xl font-bold">Jobs & metrics</h1>
+      <h1 className="condensed text-[clamp(2.4rem,5vw,3.6rem)] font-extrabold">Jobs & metrics</h1>
       <p className="mt-2 max-w-2xl text-muted">
         What a usable frame really costs: failed runs and retries count. Local ComfyUI runs show as $0; add your Mac&apos;s time when comparing with cloud.
       </p>

@@ -32,10 +32,10 @@ export function ContactSheet({ assets: initial, personaNames }: { assets: SheetA
 
   return (
     <>
-      <ul className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6">
+      <ul className="sheet mt-6 grid grid-cols-2 gap-3 rounded-[22px] px-4 py-9 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6">
         {assets.map((a, i) => (
           <li key={a.id}>
-            <button onClick={() => setOpenId(a.id)} className="frame block w-full text-left" aria-label={`Open frame ${total - i}`}>
+            <button onClick={() => setOpenId(a.id)} className="frame group block w-full text-left transition-transform hover:-translate-y-0.5" aria-label={`Open frame ${total - i}`}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={a.url} alt={a.job?.params?.scene ?? ""} loading="lazy"
                 className={`aspect-[2/3] w-full rounded-[2px] object-cover ${a.review_status === "rejected" ? "opacity-40 grayscale" : ""}`} />
@@ -115,19 +115,32 @@ function Review({ asset, frameNo, onClose, onPrev, onNext, onChange, personaName
   if (qa) meta.push(["Quality check", qa.verdict === "pass" ? "passed" : qa.verdict === "skipped" ? "not run" : qa.reason]);
 
   return (
-    <dialog ref={ref} onClose={onClose} className="m-auto max-h-[94dvh] w-[min(1100px,96vw)] overflow-hidden rounded-xl bg-paper p-0 text-ink backdrop:bg-ink/70">
+    <dialog ref={ref} onClose={onClose} className="m-auto max-h-[94dvh] w-[min(1120px,96vw)] overflow-hidden rounded-[22px] bg-paper p-0 text-ink backdrop:bg-ink/80 backdrop:backdrop-blur-sm">
       <div className="grid max-h-[94dvh] md:grid-cols-[minmax(0,1fr)_380px]">
         <div className="relative grid place-items-center bg-ink p-3">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={asset.url} alt={j?.params?.scene ?? ""} className="max-h-[60dvh] w-auto rounded-[2px] object-contain md:max-h-[88dvh]" />
-          <span className="absolute bottom-2 left-3 text-xs tabular-nums text-[#e6c86e]">Frame {String(frameNo).padStart(3, "0")}</span>
+          <span className="absolute bottom-3 left-4 text-xs tabular-nums text-safelight">Frame {String(frameNo).padStart(3, "0")}</span>
+          {onPrev && <button onClick={onPrev} aria-label="Newer frame" className="absolute left-3 top-1/2 grid size-11 -translate-y-1/2 place-items-center rounded-full bg-white/10 text-xl text-paper backdrop-blur hover:bg-white/20">‹</button>}
+          {onNext && <button onClick={onNext} aria-label="Older frame" className="absolute right-3 top-1/2 grid size-11 -translate-y-1/2 place-items-center rounded-full bg-white/10 text-xl text-paper backdrop-blur hover:bg-white/20">›</button>}
+          {asset.review_status !== "pending" && (
+            <span className={`stamp stamp-in ${asset.review_status === "accepted" ? "text-ok" : "text-bad"}`}>{asset.review_status === "accepted" ? "KEEP" : "NO"}</span>
+          )}
         </div>
         <div className="overflow-y-auto p-5">
           <div className="flex items-start justify-between gap-3">
-            <h2 className="text-2xl font-bold">{personaName ?? "Frame"} </h2>
-            <button onClick={() => ref.current?.close()} className="text-muted hover:text-ink" aria-label="Close">Close</button>
+            <div>
+              <h2 className="condensed text-[1.9rem] font-bold leading-tight">{personaName ?? "Frame"}</h2>
+              {qa && (
+                <p className={`mt-1 inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ${qa.verdict === "pass" ? "bg-ok/12 text-ok" : qa.verdict === "fail" ? "bg-bad/10 text-bad" : "bg-backdrop text-muted"}`}>
+                  <span className="size-1.5 rounded-full bg-current" aria-hidden />
+                  {qa.verdict === "pass" ? "Passed the quality check" : qa.verdict === "fail" ? "Quality check flagged it" : "Not quality-checked"}
+                </p>
+              )}
+            </div>
+            <button onClick={() => ref.current?.close()} className="grid size-9 shrink-0 place-items-center rounded-full ring-1 ring-line hover:ring-ink" aria-label="Close">✕</button>
           </div>
-          <p className="mt-2 text-sm">{j?.params?.scene || j?.prompt}</p>
+          <p className="mt-3 text-sm leading-relaxed">{j?.params?.scene || j?.prompt}</p>
 
           <div className="mt-4 flex gap-2">
             <button disabled={pending} onClick={() => save("accepted")}
@@ -135,11 +148,26 @@ function Review({ asset, frameNo, onClose, onPrev, onNext, onChange, personaName
             <button disabled={pending} onClick={() => save("rejected")}
               className={`btn flex-1 ${asset.review_status === "rejected" ? "bg-bad text-white" : "btn-ghost"}`}>Reject</button>
           </div>
-          <p className="mt-1 text-xs text-muted">Keys: A keep, R reject, arrows to move.</p>
+          {asset.persona_id && (
+            <button className="btn btn-ghost mt-2 w-full" disabled={pending}
+              onClick={() => start(async () => {
+                const r = await setAssetAsReference(asset.id);
+                if (r.ok) onChange({ review_status: "accepted" });
+                setErr(r.ok ? "" : r.error);
+                setRefMsg(r.ok ? r.message ?? "Saved" : "");
+              })}>
+              Make this {personaName ? `${personaName.split(" ")[0]}'s` : "the"} face
+            </button>
+          )}
+          {refMsg && <p role="status" className="mt-2 text-sm text-ok">{refMsg}</p>}
+          <div className="mt-3 flex gap-2">
+            <a href={asset.url} download target="_blank" rel="noreferrer" className="btn btn-ghost flex-1">Download</a>
+          </div>
+          <p className="mt-2 text-xs text-muted">Keys: A keep, R reject, arrows to move.</p>
 
-          <fieldset className="mt-5">
-            <legend className="font-semibold">Scores</legend>
-            <div className="mt-2 space-y-2">
+          <details className="mt-5 rounded-xl ring-1 ring-line" open={Boolean(j?.scene_key) || Object.keys(asset.scores ?? {}).length > 0}>
+            <summary className="cursor-pointer p-3 text-sm font-semibold">Score this frame <span className="font-normal text-muted">for comparing engines</span></summary>
+            <div className="space-y-2 px-3 pb-3">
               {SCORE_CRITERIA.map((c) => (
                 <div key={c.key} className="flex items-center justify-between gap-3 text-sm">
                   <span>{c.label}</span>
@@ -154,28 +182,13 @@ function Review({ asset, frameNo, onClose, onPrev, onNext, onChange, personaName
                   </div>
                 </div>
               ))}
+              <label className="label pt-2" htmlFor="notes">Notes</label>
+              <textarea id="notes" rows={2} className="field text-sm" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Jawline drifts, earrings missing…" />
+              <button className="btn btn-primary mt-1" disabled={pending} onClick={() => save()}>Save scores</button>
             </div>
-          </fieldset>
+          </details>
 
-          <label className="label mt-4" htmlFor="notes">Notes</label>
-          <textarea id="notes" rows={2} className="field text-sm" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Jawline drifts, earrings missing…" />
-          <div className="mt-3 flex items-center gap-3">
-            <button className="btn btn-primary" disabled={pending} onClick={() => save()}>Save scores</button>
-            <a href={asset.url} download target="_blank" rel="noreferrer" className="btn btn-ghost">Download</a>
-          </div>
-          {asset.persona_id && (
-            <button className="btn btn-ghost mt-3 w-full" disabled={pending}
-              onClick={() => start(async () => {
-                const r = await setAssetAsReference(asset.id);
-                if (r.ok) onChange({ review_status: "accepted" });
-                setErr(r.ok ? "" : r.error);
-                setRefMsg(r.ok ? r.message ?? "Saved" : "");
-              })}>
-              Use as {personaName ?? "persona"}&apos;s face reference
-            </button>
-          )}
-          {refMsg && <p className="mt-2 text-sm text-ok">{refMsg}</p>}
-          <details className="mt-3 rounded-lg border border-line p-3 text-sm">
+          <details className="mt-3 rounded-xl p-3 text-sm ring-1 ring-line">
             <summary className="cursor-pointer font-semibold text-bad">Report a defect</summary>
             <p className="mt-2 text-muted">Extra limbs, broken hands or a melted face? Report it and the credits for this frame come back.</p>
             <div className="mt-2 flex flex-wrap gap-2">
@@ -205,10 +218,7 @@ function Review({ asset, frameNo, onClose, onPrev, onNext, onChange, personaName
             <p className="mt-2 rounded bg-backdrop p-2">{j?.prompt}</p>
             {j?.negative_prompt && <p className="mt-1 rounded bg-backdrop p-2 text-muted">Avoid: {j.negative_prompt}</p>}
           </details>
-          <div className="mt-5 flex justify-between text-sm">
-            <button disabled={!onPrev} onClick={onPrev} className="text-muted hover:text-ink disabled:opacity-30">Newer</button>
-            <button disabled={!onNext} onClick={onNext} className="text-muted hover:text-ink disabled:opacity-30">Older</button>
-          </div>
+
         </div>
       </div>
     </dialog>

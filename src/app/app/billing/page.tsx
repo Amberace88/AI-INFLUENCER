@@ -55,10 +55,8 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
   return (
     <div className="max-w-6xl space-y-12">
       <header>
-        <p className="text-sm text-muted">Plan & credits</p>
-        <h1 className="mt-1 text-[clamp(2.2rem,4.5vw,3.4rem)] font-extrabold">
-          {bill.balance} credit{bill.balance === 1 ? "" : "s"} left
-        </h1>
+        <h1 className="condensed text-[clamp(2.4rem,5vw,3.6rem)] font-extrabold">Plan & credits</h1>
+        <p className="mt-1 text-muted"><b className="tabular-nums text-ink">{bill.balance}</b> credit{bill.balance === 1 ? "" : "s"} left. Monthly credits are used first, extra credits after.</p>
       </header>
 
       {paid && (
@@ -151,7 +149,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
                   <h3 className="text-xl font-bold">{p.name}</h3>
                   {current && <span className="rounded-full bg-accent px-2 py-0.5 text-xs font-semibold text-white">Your plan</span>}
                 </div>
-                <p className="mt-3"><span className="text-4xl font-extrabold tabular-nums">€{price.toFixed(2)}</span><span className="text-muted"> / month</span></p>
+                <p className="mt-3"><span className="condensed text-5xl font-extrabold tabular-nums">€{price.toFixed(2)}</span><span className="text-muted"> / month</span></p>
                 <ul className="mt-4 flex-1 space-y-1.5 text-sm">
                   <li><b className="tabular-nums">{p.monthly_credits}</b> credits every month <span className="text-muted">({perCredit.toFixed(1)}¢ each)</span></li>
                   <li>About <b className="tabular-nums">{Math.floor(p.monthly_credits / 2)}</b> photos with the same face</li>

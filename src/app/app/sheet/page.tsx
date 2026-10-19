@@ -39,30 +39,56 @@ export default async function SheetPage({ searchParams }: { searchParams: Promis
     return `/app/sheet${s ? `?${s}` : ""}`;
   };
 
+  const { data: counts } = await supabase.from("assets").select("review_status").eq("owner_id", user.id);
+  const n = (st?: string) => (counts ?? []).filter((c) => !st || c.review_status === st).length;
+  const label = (id: string) => (id === "pending" ? n("pending") : id === "accepted" ? n("accepted") : id === "rejected" ? n("rejected") : n());
+
   return (
-    <div>
-      <h1 className="text-4xl font-bold">Contact sheet</h1>
-      <div className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-3 text-sm">
-        <div className="flex gap-1 rounded-full border border-line bg-paper p-1">
+    <div className="max-w-[1500px]">
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="condensed text-[clamp(2.4rem,5vw,3.6rem)] font-extrabold">Contact sheet</h1>
+          <p className="mt-1 max-w-[62ch] text-muted">
+            Every frame you shot. Keep the good ones, reject the rest, and use the best as a persona&apos;s face.
+            {n("pending") > 0 && <span className="text-ink"> {n("pending")} waiting for your review.</span>}
+          </p>
+        </div>
+        <Link href="/app/studio" className="btn btn-primary px-5">Shoot more</Link>
+      </header>
+
+      <div className="mt-7 flex flex-wrap items-center gap-x-5 gap-y-3 text-sm">
+        <nav aria-label="Review status" className="flex gap-1 rounded-full bg-paper p-1 ring-1 ring-line">
           {FILTERS.map((f) => (
-            <Link key={f.id} href={href({ status: f.id })} aria-current={(sp.status ?? "") === f.id ? "true" : undefined}
-              className={`rounded-full px-3 py-1 ${(sp.status ?? "") === f.id ? "bg-ink text-paper" : "text-muted hover:text-ink"}`}>{f.label}</Link>
+            <Link key={f.id} href={href({ status: f.id })} aria-current={(sp.status ?? "") === f.id ? "page" : undefined}
+              className={`rounded-full px-3.5 py-1.5 ${(sp.status ?? "") === f.id ? "bg-ink text-paper" : "text-muted hover:text-ink"}`}>
+              {f.label} <span className="tabular-nums opacity-60">{label(f.id)}</span>
+            </Link>
           ))}
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Link href={href({ persona: "" })} className={!sp.persona ? "font-semibold" : "text-muted hover:text-ink"}>Every persona</Link>
-          {(personas ?? []).map((p) => (
-            <Link key={p.id} href={href({ persona: p.id })} className={sp.persona === p.id ? "font-semibold" : "text-muted hover:text-ink"}>{p.name}</Link>
-          ))}
-        </div>
-        {sp.run && <Link href={href({ run: "" })} className="text-accent">Showing one benchmark run. Show all</Link>}
+        </nav>
+        {(personas?.length ?? 0) > 1 && (
+          <nav aria-label="Persona" className="flex flex-wrap gap-1">
+            <Link href={href({ persona: "" })} aria-current={!sp.persona ? "page" : undefined}
+              className={`rounded-full px-3.5 py-1.5 ${!sp.persona ? "bg-paper font-semibold ring-1 ring-ink" : "text-muted hover:text-ink"}`}>Everyone</Link>
+            {(personas ?? []).map((p) => (
+              <Link key={p.id} href={href({ persona: p.id })} aria-current={sp.persona === p.id ? "page" : undefined}
+                className={`rounded-full px-3.5 py-1.5 ${sp.persona === p.id ? "bg-paper font-semibold ring-1 ring-ink" : "text-muted hover:text-ink"}`}>{p.name}</Link>
+            ))}
+          </nav>
+        )}
+        {sp.persona && (personas?.length ?? 0) <= 1 && <Link href={href({ persona: "" })} className="text-muted hover:text-ink">Show every persona</Link>}
+        {sp.run && <Link href={href({ run: "" })} className="text-accent">One benchmark run shown. Show all</Link>}
+        <p className="ml-auto hidden text-xs text-muted lg:block">Open a frame, then A to keep, R to reject, arrows to move.</p>
       </div>
 
       {error && <p className="mt-6 text-bad">{error.message}</p>}
       {!assets.length ? (
-        <p className="mt-10 max-w-md rounded-xl border border-dashed border-line bg-paper p-6 text-muted">
-          No frames here yet. Shoot something in the <Link href="/app/studio" className="text-accent underline">Studio</Link>.
-        </p>
+        <div className="sheet mt-8 grid min-h-72 place-items-center rounded-[22px] px-6 py-16 text-center">
+          <div>
+            <p className="condensed text-2xl font-bold text-paper">{sp.status || sp.persona ? "Nothing matches this filter" : "The sheet is empty"}</p>
+            <p className="mt-1 text-sm text-[#9eabb9]">{sp.status || sp.persona ? "Try another filter." : "Frames you shoot in the Studio develop here."}</p>
+            {!sp.status && !sp.persona && <Link href="/app/studio" className="btn btn-primary mt-5">Open the Studio</Link>}
+          </div>
+        </div>
       ) : (
         <ContactSheet assets={assets} personaNames={Object.fromEntries((personas ?? []).map((p) => [p.id, p.name]))} />
       )}

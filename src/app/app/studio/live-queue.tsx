@@ -127,7 +127,7 @@ export function LiveQueue({ userId, initial, personaNames }: { userId: string; i
                 <li key={j.id} className="grid grid-cols-[64px_1fr] gap-3 rounded-xl p-2 transition-colors hover:bg-white/[.04]">
                   <div className="aspect-[2/3] overflow-hidden rounded-[3px] bg-[#222c38] ring-1 ring-white/10">
                     {thumb ? (
-                      <Link href="/app/sheet" aria-label="Open on the contact sheet">
+                      <Link href="/app/sheet" aria-label="Open on the contact sheet" className="block h-full">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={thumb} alt="" className={`h-full w-full object-cover ${fresh.has(j.id) ? "developing" : ""}`} />
                       </Link>

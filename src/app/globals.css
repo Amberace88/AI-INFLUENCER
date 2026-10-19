@@ -170,3 +170,14 @@ details.faq[open] > div { animation: panel-in .3s ease both; }
 
 /* Social post preview */
 .post-preview { box-shadow: 0 1px 0 var(--line), 0 18px 40px -28px rgba(23,32,43,.45); }
+
+/* Contact sheet: negatives laid on a dark sheet, sprocket holes along the edges */
+.sheet { background: var(--ink); position: relative; }
+.sheet::before, .sheet::after {
+  content: ""; position: absolute; left: 18px; right: 18px; height: 8px;
+  background: repeating-linear-gradient(90deg, #2b3644 0 14px, transparent 14px 26px);
+  border-radius: 2px; pointer-events: none;
+}
+.sheet::before { top: 10px; }
+.sheet::after { bottom: 10px; }
+.sheet .frame { background: #0f161f; }

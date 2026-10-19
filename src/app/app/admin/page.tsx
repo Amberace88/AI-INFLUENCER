@@ -48,8 +48,8 @@ export default async function AdminPage() {
   return (
     <div className="max-w-6xl space-y-12">
       <header>
-        <p className="text-sm text-muted">Only you can see this page.</p>
-        <h1 className="mt-1 text-4xl font-bold">Admin</h1>
+        <h1 className="condensed text-[clamp(2.4rem,5vw,3.6rem)] font-extrabold">Admin</h1>
+        <p className="mt-1 text-muted">The whole platform at a glance. Only you can see this page.</p>
       </header>
 
       <dl className="grid gap-px overflow-hidden rounded-2xl bg-line sm:grid-cols-2 lg:grid-cols-3">
