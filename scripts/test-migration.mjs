@@ -198,3 +198,24 @@ console.log("✓ twin: paid plan only, one per account, consent stored");
   assert.equal((await as(E, `select review_status from assets where id=$1`, [aid])).rows[0].review_status, "rejected");
   console.log("✓ defect reports refund once, own assets only");
 }
+
+// ---- migration 6: economics ----
+{
+  await assert.rejects(as(B, `select admin_economics()`), /not_admin/);
+  await assert.rejects(as(B, `select admin_set_daily_limit(100)`), /not_admin/);
+  const ec = (await as(A, `select admin_economics() as e`)).rows[0].e;
+  // Pro: 69.99 / 1.21 - (69.99*0.015 + 0.25) = 56.5426 / 1200 ≈ 0.0471 — the lowest net € per credit
+  assert.equal(ec.credit_floor_source, "plan Pro");
+  assert.ok(Math.abs(ec.credit_floor_eur - 0.0471) < 0.0002, `credit floor ${ec.credit_floor_eur}`);
+  const ref = ec.actions.find((a) => a.kind === "image_ref");
+  assert.ok(ref.ok && ref.multiple > 5, `image_ref margin ${ref.multiple}x`);
+  assert.ok(ec.actions.every((a) => a.ok), "every action meets the 3x rule");
+  await as(A, `select admin_set_daily_limit(12.5)`);
+  await assert.rejects(as(A, `select admin_set_daily_limit(-1)`), /bad_limit/);
+  await asService(`update jobs set status='succeeded', finished_at=now(), provider_cost_usd=0.5 where id = (select id from jobs limit 1)`);
+  const sp = (await asService(`select worker_spend_today() as s`)).rows[0].s;
+  assert.equal(Number(sp.limit_usd), 12.5);
+  assert.ok(Number(sp.spent_usd) >= 0.5, "today's spend counted");
+  await assert.rejects(as(A, `select worker_spend_today()`), /permission denied/);
+  console.log("✓ economics: credit floor after VAT + fees, margin rule, daily limit");
+}

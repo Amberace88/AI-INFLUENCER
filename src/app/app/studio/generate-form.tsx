@@ -103,7 +103,7 @@ export function GenerateForm({
           {WORKFLOWS.filter((w) => w.primary).map((w) => <WorkflowCard key={w.id} w={w} />)}
         </div>
         <details className="mt-2" open={!WORKFLOWS.find((w) => w.id === workflowId)?.primary}>
-          <summary className="cursor-pointer text-sm text-muted hover:text-ink">More engines (ComfyUI on your Mac, fal.ai)</summary>
+          <summary className="cursor-pointer text-sm text-muted hover:text-ink">More engines (test models, ComfyUI, fal.ai)</summary>
           <div className="mt-2 grid gap-2 md:grid-cols-2">
             {WORKFLOWS.filter((w) => !w.primary).map((w) => <WorkflowCard key={w.id} w={w} />)}
           </div>

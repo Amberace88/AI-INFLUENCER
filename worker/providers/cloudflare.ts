@@ -15,12 +15,18 @@ import { Job, PermanentError, Provider, ProviderResult, RunContext } from "../ty
  *   $0.002 per input-image MP (≈$0.016 / image).
  */
 type SchnellPreset = { kind: "schnell"; model: string; maxSteps: number; tileNeurons: number; stepNeurons: number };
-type KleinPreset = { kind: "klein"; model: string; maxRefs: number; usdFirstMp: number; usdExtraMp: number; usdInputMp: number };
+type KleinPreset = { kind: "klein"; model: string; maxRefs: number } & (
+  | { pricing: "mp"; usdFirstMp: number; usdExtraMp: number; usdInputMp: number }
+  | { pricing: "tile"; usdOutTile: number; usdInTile: number }
+);
 
 const PRESETS: Record<string, SchnellPreset | KleinPreset> = {
   cf_flux_schnell: { kind: "schnell", model: "@cf/black-forest-labs/flux-1-schnell", maxSteps: 8, tileNeurons: 4.8, stepNeurons: 9.6 },
-  cf_klein_ref: { kind: "klein", model: "@cf/black-forest-labs/flux-2-klein-9b", maxRefs: 4, usdFirstMp: 0.015, usdExtraMp: 0.002, usdInputMp: 0.002 },
-  cf_klein_text: { kind: "klein", model: "@cf/black-forest-labs/flux-2-klein-9b", maxRefs: 0, usdFirstMp: 0.015, usdExtraMp: 0.002, usdInputMp: 0.002 },
+  cf_klein_ref: { kind: "klein", model: "@cf/black-forest-labs/flux-2-klein-9b", maxRefs: 4, pricing: "mp", usdFirstMp: 0.015, usdExtraMp: 0.002, usdInputMp: 0.002 },
+  cf_klein_text: { kind: "klein", model: "@cf/black-forest-labs/flux-2-klein-9b", maxRefs: 0, pricing: "mp", usdFirstMp: 0.015, usdExtraMp: 0.002, usdInputMp: 0.002 },
+  // FLUX.2 klein 4B: priced per 512×512 tile (26.05 neurons out, 5.37 neurons in) ≈ $0.002 per 832×1248 image
+  cf_klein4_ref: { kind: "klein", model: "@cf/black-forest-labs/flux-2-klein-4b", maxRefs: 4, pricing: "tile", usdOutTile: 0.000287, usdInTile: 0.000059 },
+  cf_klein4_text: { kind: "klein", model: "@cf/black-forest-labs/flux-2-klein-4b", maxRefs: 0, pricing: "tile", usdOutTile: 0.000287, usdInTile: 0.000059 },
 };
 const USD_PER_NEURON = 0.011 / 1000;
 
@@ -29,10 +35,16 @@ export function estimateNeurons(p: { tileNeurons: number; stepNeurons: number },
   return tiles * p.tileNeurons + steps * p.stepNeurons;
 }
 
-export function estimateKleinUsd(p: KleinPreset, width: number, height: number, inputMp: number) {
+const tilesOf = (w: number, h: number) => Math.ceil(w / 512) * Math.ceil(h / 512);
+export function estimateKleinUsd(p: KleinPreset, width: number, height: number, inputs: { width: number; height: number }[]) {
+  if (p.pricing === "tile") return tilesOf(width, height) * p.usdOutTile + inputs.reduce((a, i) => a + tilesOf(i.width, i.height) * p.usdInTile, 0);
   const mp = (width * height) / 1_000_000;
+  const inputMp = inputs.reduce((a, i) => a + (i.width * i.height) / 1_000_000, 0);
   return p.usdFirstMp + Math.max(0, mp - 1) * p.usdExtraMp + inputMp * p.usdInputMp;
 }
+
+/** Approximate cost of one vision call (face locate / QA) on Mistral Small 3.1. */
+export const VISION_CALL_USD = 0.0005;
 
 /** Reference images must be smaller than 512×512 for klein. */
 export async function shrinkReference(data: Buffer): Promise<{ data: Buffer; width: number; height: number }> {
@@ -45,6 +57,7 @@ export async function shrinkReference(data: Buffer): Promise<{ data: Buffer; wid
  * sending only the face keeps identity while the scene comes from the prompt.
  */
 const cropCache = new Map<string, Buffer>();
+export let faceLookups = 0; // vision calls made (for cost accounting)
 export async function faceCrop(data: Buffer, log: (m: string) => void = () => {}): Promise<Buffer> {
   const key = createHash("sha1").update(data).digest("hex");
   const hit = cropCache.get(key);
@@ -55,7 +68,7 @@ export async function faceCrop(data: Buffer, log: (m: string) => void = () => {}
 
   let box: Box | null = null;
   if (qaEnabled()) {
-    try { box = await locateFace(upright); } catch (e) { log(`face locate failed, using centre crop (${(e as Error).message.slice(0, 80)})`); }
+    try { faceLookups++; box = await locateFace(upright); } catch (e) { log(`face locate failed, using centre crop (${(e as Error).message.slice(0, 80)})`); }
   }
   // fallback: portraits have the head in the upper-middle
   const b = box ?? { x0: 0.32, y0: 0.06, x1: 0.68, y1: 0.36 };
@@ -133,10 +146,11 @@ export const cloudflareProvider: Provider = {
     if (preset.maxRefs && !refs.length) throw new PermanentError("This workflow needs at least one reference photo of the persona.");
 
     const form = new FormData();
-    let inputMp = 0;
+    const inputs: { width: number; height: number }[] = [];
+    const lookupsBefore = faceLookups;
     for (const [i, r] of refs.entries()) {
       const small = await shrinkReference(await faceCrop(r.data, ctx.log));
-      inputMp += (small.width * small.height) / 1_000_000;
+      inputs.push(small);
       form.append(`input_image_${i}`, new Blob([new Uint8Array(small.data)], { type: "image/jpeg" }), `ref${i}.jpg`);
     }
     const imgs = refs.length === 1 ? "image 0" : `images 0-${refs.length - 1}`;
@@ -158,7 +172,7 @@ export const cloudflareProvider: Provider = {
     ctx.onProgress(1);
     return {
       images: [{ data, mime: sz.mime === "application/octet-stream" ? "image/jpeg" : sz.mime, width: sz.width ?? width, height: sz.height ?? height }],
-      costUsd: Math.round(estimateKleinUsd(preset, width, height, inputMp) * 1e5) / 1e5,
+      costUsd: Math.round((estimateKleinUsd(preset, width, height, inputs) + (faceLookups - lookupsBefore) * VISION_CALL_USD) * 1e5) / 1e5,
       meta: { model: preset.model, seed, references: refs.length },
     };
   },

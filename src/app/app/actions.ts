@@ -364,6 +364,16 @@ export async function adminGrantCredits(userId: string, amount: number, note: st
   return { ok: true, message: `${amount > 0 ? "Added" : "Removed"} ${Math.abs(amount)} credits.` };
 }
 
+export async function adminSetDailyLimit(_: ActionResult | null, form: FormData): Promise<ActionResult> {
+  const { supabase } = await requireUser();
+  const usd = Number(String(form.get("usd") ?? "").replace(",", "."));
+  if (!Number.isFinite(usd) || usd < 0 || usd > 1000) return { ok: false, error: "Enter dollars between 0 and 1000." };
+  const { error } = await supabase.rpc("admin_set_daily_limit", { p_usd: usd });
+  if (error) return { ok: false, error: error.message.includes("not_admin") ? "Admin only." : error.message };
+  revalidatePath("/app/admin");
+  return { ok: true, message: `Daily limit set to $${usd}. The worker picks it up within 30 seconds.` };
+}
+
 // A generated frame becomes the persona's main reference photo.
 export async function setAssetAsReference(assetId: string): Promise<ActionResult> {
   const { supabase, user } = await requireUser();

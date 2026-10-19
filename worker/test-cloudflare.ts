@@ -8,6 +8,7 @@ async function main() {
   let lastBody: Record<string, unknown> = {};
   let lastAuth = "";
   let faceCalls = 0;
+  let lastModel = "";
   let lastForm: { contentType: string; fields: string[]; prompt: string } = { contentType: "", fields: [], prompt: "" };
   const server = createServer(async (req, res) => {
     const chunks: Buffer[] = [];
@@ -19,7 +20,8 @@ async function main() {
       faceCalls++;
       return json({ choices: [{ message: { content: 'Here: {"x0": 400, "y0": 100, "x1": 600, "y1": 300}' } }] });
     }
-    if (req.url?.endsWith("/ai/run/@cf/black-forest-labs/flux-2-klein-9b")) {
+    if (req.url?.endsWith("/ai/run/@cf/black-forest-labs/flux-2-klein-9b") || req.url?.endsWith("/ai/run/@cf/black-forest-labs/flux-2-klein-4b")) {
+      lastModel = String(req.url).split("/").pop() ?? "";
       const raw = Buffer.concat(chunks).toString("latin1");
       lastForm = {
         contentType: String(req.headers["content-type"]),
@@ -90,6 +92,14 @@ async function main() {
   assert.ok((k.costUsd ?? 0) > 0.014 && (k.costUsd ?? 1) < 0.02, `klein cost ${k.costUsd}`);
   await assert.rejects(cloudflareProvider.run({ ...job, workflow: "cf_klein_ref" }, { references: [], onProgress: () => {}, log: () => {} }), PermanentError);
   console.log("✓ cloudflare klein with references");
+
+  // klein 4B: same request shape, tile pricing (6 output tiles + 1 input tile per reference)
+  const k4 = await cloudflareProvider.run({ ...job, workflow: "cf_klein4_ref", params: { width: 832, height: 1248, seed: 7 } }, { references: refs, onProgress: () => {}, log: () => {} });
+  assert.equal(lastModel, "flux-2-klein-4b");
+  assert.deepEqual(lastForm.fields.sort(), ["height", "input_image_0", "input_image_1", "prompt", "seed", "width"]);
+  assert.ok((k4.costUsd ?? 1) < 0.003, `4B cost ${k4.costUsd}`);
+  assert.ok((k.costUsd ?? 0) / (k4.costUsd ?? 1) > 5, "4B is several times cheaper");
+  console.log(`✓ cloudflare klein 4B ($${k4.costUsd} vs 9B $${k.costUsd})`);
   server.close();
 }
 main().catch((e) => { console.error(e); process.exit(1); });

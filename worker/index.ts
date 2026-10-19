@@ -9,7 +9,7 @@ import { createClient } from "@supabase/supabase-js";
 import { config } from "./config";
 import { comfyuiProvider } from "./providers/comfyui";
 import { falProvider } from "./providers/fal";
-import { cloudflareProvider } from "./providers/cloudflare";
+import { cloudflareProvider, VISION_CALL_USD } from "./providers/cloudflare";
 import { Job, PermanentError, Provider, ProviderResult, ReferenceImage } from "./types";
 import { inspect, qaEnabled, type QaResult } from "./qa";
 
@@ -80,6 +80,7 @@ async function processJob(job: Job) {
       const r = await provider.run(attemptJob, { references, onProgress, log: (m) => log(`  ${m}`) });
       if (!qaEnabled()) { result = r; break; }
       try {
+        extraCost += VISION_CALL_USD;
         qa = await inspect(r.images[0].data);
       } catch (e) {
         qa = { verdict: "skipped", reason: `QA error: ${(e as Error).message}` };
@@ -149,6 +150,27 @@ async function check() {
   return ok;
 }
 
+/**
+ * Daily spend guard: if today's provider cost (UTC day) reaches the limit, the worker stops
+ * claiming paid jobs until midnight UTC. Jobs stay queued, nothing is lost or charged twice.
+ * Limit: app_settings.daily_cost_limit_usd (editable by admin), DAILY_COST_LIMIT_USD overrides.
+ */
+let guardCheckedAt = 0;
+let guardBlocked = false;
+async function spendGuardBlocks(): Promise<boolean> {
+  if (Date.now() - guardCheckedAt < 30_000) return guardBlocked;
+  guardCheckedAt = Date.now();
+  const { data, error } = await db.rpc("worker_spend_today");
+  if (error) { log(`spend guard unavailable: ${error.message}`); return (guardBlocked = false); }
+  const row = data as { spent_usd: number; limit_usd: number } | null;
+  const limit = Number(process.env.DAILY_COST_LIMIT_USD || row?.limit_usd || 5);
+  const spent = Number(row?.spent_usd ?? 0);
+  const blocked = spent >= limit;
+  if (blocked && !guardBlocked) log(`⛔ daily spend limit reached ($${spent.toFixed(3)} of $${limit}) — paid jobs wait until 00:00 UTC`);
+  if (!blocked && guardBlocked) log(`✓ spend limit OK again ($${spent.toFixed(3)} of $${limit})`);
+  return (guardBlocked = blocked);
+}
+
 let stopping = false;
 process.on("SIGINT", () => { if (stopping) process.exit(1); stopping = true; log("stopping after current job… (Ctrl+C again to force)"); });
 process.on("SIGTERM", () => { stopping = true; });
@@ -166,13 +188,19 @@ async function main() {
     }
   } else log("! quality check off");
   if (process.argv.includes("--check")) process.exit(ok ? 0 : 1);
-  log("waiting for jobs…");
+  await spendGuardBlocks();
+  log(`waiting for jobs… (daily spend so far ${guardBlocked ? "over limit" : "under limit"})`);
   while (!stopping) {
-    const { data, error } = await db.rpc("claim_next_job", { p_worker_id: config.workerId, p_providers: config.providers });
+    // paid cloud providers pause when the daily limit is hit; local ComfyUI keeps working
+    const blocked = await spendGuardBlocks();
+    const usable = blocked ? config.providers.filter((p) => p === "comfyui") : config.providers;
+    if (!usable.length) { await sleep(config.pollMs * 5); continue; }
+    const { data, error } = await db.rpc("claim_next_job", { p_worker_id: config.workerId, p_providers: usable });
     if (error) { log(`claim error: ${error.message}`); await sleep(config.pollMs * 3); continue; }
     const job = (data as Job[] | null)?.[0];
     if (!job) { await sleep(config.pollMs); continue; }
     await processJob(job);
+    guardCheckedAt = 0; // re-check spend after every paid job
   }
   log("worker stopped");
 }
