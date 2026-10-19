@@ -2,8 +2,8 @@
 // "kind" maps to public.generation_costs (credit price lives in the DB).
 export type Workflow = {
   id: string;
-  provider: "comfyui" | "fal";
-  kind: "image_sd" | "image_hd";
+  provider: "comfyui" | "fal" | "cloudflare";
+  kind: "image_sd" | "image_hd" | "image_fast";
   label: string;
   hint: string;
   needsReference: boolean;
@@ -11,6 +11,15 @@ export type Workflow = {
 };
 
 export const WORKFLOWS: Workflow[] = [
+  {
+    id: "cf_flux_schnell",
+    provider: "cloudflare",
+    kind: "image_fast",
+    label: "Cloud · fast draft (FLUX schnell)",
+    hint: "Cloudflare Workers AI. Seconds per image, ~150 free a day. Square 1024 px only; identity from the description, no fixed seed.",
+    needsReference: false,
+    defaults: { width: 1024, height: 1024, steps: 4, cfg: 0 },
+  },
   {
     id: "txt2img_basic",
     provider: "comfyui",
@@ -80,10 +89,42 @@ export const SCORE_CRITERIA = [
   { key: "ad_suitability", label: "Usable in an ad" },
 ] as const;
 
+export const ROLES = [
+  { id: "influencer", label: "Influencer", hint: "lifestyle creator who recommends products to followers" },
+  { id: "ambassador", label: "Brand ambassador", hint: "the recurring face of one brand across campaigns" },
+  { id: "blogger", label: "Blogger", hint: "writes and shows expertise on a niche topic" },
+  { id: "representative", label: "Company representative", hint: "speaks for a company: news, offers, behind the scenes" },
+  { id: "educator", label: "Educator", hint: "explains and teaches, tutorials and tips" },
+  { id: "support", label: "Customer helper", hint: "friendly face for FAQs, onboarding and how-to content" },
+] as const;
+
+export const LANGUAGES = [
+  { id: "es", label: "Spanish" },
+  { id: "en", label: "English" },
+  { id: "lv", label: "Latvian" },
+  { id: "ru", label: "Russian" },
+  { id: "de", label: "German" },
+  { id: "fr", label: "French" },
+  { id: "it", label: "Italian" },
+  { id: "pt", label: "Portuguese" },
+] as const;
+
 export type Persona = {
   id: string;
   name: string;
   tagline: string | null;
+  role: string;
+  language: string;
+  bio: string | null;
+  backstory: string | null;
+  voice: string | null;
+  values_text: string | null;
+  topics: string[];
+  audience: string | null;
+  dos: string | null;
+  donts: string | null;
+  locations: string | null;
+  brand_name: string | null;
   appearance: Record<string, string>;
   personality: string | null;
   style_notes: string | null;

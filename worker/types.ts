@@ -13,7 +13,7 @@ export type Job = {
   owner_id: string;
   persona_id: string | null;
   kind: string;
-  provider: "comfyui" | "fal";
+  provider: "comfyui" | "fal" | "cloudflare";
   workflow: string;
   prompt: string;
   negative_prompt: string;

@@ -9,12 +9,13 @@ import { createClient } from "@supabase/supabase-js";
 import { config } from "./config";
 import { comfyuiProvider } from "./providers/comfyui";
 import { falProvider } from "./providers/fal";
+import { cloudflareProvider } from "./providers/cloudflare";
 import { Job, PermanentError, Provider, ReferenceImage } from "./types";
 
-const all: Record<string, Provider> = { comfyui: comfyuiProvider, fal: falProvider };
+const all: Record<string, Provider> = { comfyui: comfyuiProvider, fal: falProvider, cloudflare: cloudflareProvider };
 const providers = config.providers.map((n) => {
   const p = all[n];
-  if (!p) throw new Error(`Unknown provider "${n}" in WORKER_PROVIDERS (use comfyui,fal)`);
+  if (!p) throw new Error(`Unknown provider "${n}" in WORKER_PROVIDERS (use comfyui,fal,cloudflare)`);
   return p;
 });
 

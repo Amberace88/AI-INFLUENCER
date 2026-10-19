@@ -11,8 +11,8 @@
     "worker": "tsx worker/index.ts",
     "worker:check": "tsx worker/index.ts --check",
     "test:db": "node scripts/test-migration.mjs",
-    "test:worker": "tsx worker/test-comfyui.ts",
-    "test": "npm run test:db && npm run test:worker"
+    "test:worker": "tsx worker/test-comfyui.ts && tsx worker/test-cloudflare.ts",
+    "test": "npm run test:db && npm run test:worker && tsx scripts/test-json.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
@@ -20,6 +20,7 @@
     "next": "15.5.28",
     "react": "19.1.0",
     "react-dom": "19.1.0",
+    "server-only": "^0.0.1",
     "zod": "^4.6.7"
   },
   "devDependencies": {

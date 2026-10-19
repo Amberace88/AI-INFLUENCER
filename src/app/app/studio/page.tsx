@@ -29,6 +29,7 @@ export default async function StudioPage({ searchParams }: { searchParams: Promi
           personasWithRefs={[...withRefs]}
           costs={costMap}
           initialPersona={sp.persona ?? (personas?.[0]?.id as string | undefined) ?? ""}
+          initialScene={sp.scene ?? ""}
         />
       </section>
       <aside>

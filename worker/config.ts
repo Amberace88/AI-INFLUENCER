@@ -32,6 +32,11 @@ export const config = {
     checkpoint: process.env.COMFYUI_CHECKPOINT || "", // empty → first checkpoint ComfyUI reports
     timeoutMs: Number(process.env.COMFYUI_TIMEOUT_MS || 10 * 60 * 1000),
   },
+  cloudflare: {
+    accountId: process.env.CLOUDFLARE_ACCOUNT_ID || "",
+    token: process.env.CLOUDFLARE_API_TOKEN || "",
+    apiBase: (process.env.CF_API_BASE || "https://api.cloudflare.com/client/v4").replace(/\/$/, ""),
+  },
   fal: {
     key: process.env.FAL_KEY || "",
     timeoutMs: Number(process.env.FAL_TIMEOUT_MS || 5 * 60 * 1000),

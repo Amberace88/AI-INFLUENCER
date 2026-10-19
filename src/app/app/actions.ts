@@ -6,6 +6,8 @@ import { randomUUID } from "node:crypto";
 import { requireUser } from "@/lib/supabase/server";
 import { APPEARANCE_FIELDS, composePrompt, identityFromAppearance, sizeFor, workflowById, type Persona } from "@/lib/catalog";
 import { BENCHMARK_BASE_SEED, BENCHMARK_SCENES } from "@/lib/benchmark";
+import { draftPersona, draftPosts } from "@/lib/ai/persona";
+import { AiConfigError } from "@/lib/ai/text";
 
 export type ActionResult = { ok: true; message?: string; id?: string } | { ok: false; error: string };
 
@@ -17,6 +19,7 @@ const RPC_ERRORS: Record<string, string> = {
   prompt_too_long: "The prompt is too long (max 4,000 characters).",
   unknown_kind: "This generation type is not available.",
   job_not_cancelable: "Only waiting jobs can be cancelled.",
+  persona_limit_reached: "Your plan's persona limit is reached. Upgrade the plan or delete a persona.",
 };
 function friendly(msg: string) {
   const key = Object.keys(RPC_ERRORS).find((k) => msg.includes(k));
@@ -49,6 +52,18 @@ export async function savePersona(_: ActionResult | null, form: FormData): Promi
     negative_prompt: String(form.get("negative_prompt") || "").trim(),
     is_fictional: isFictional,
     consent_confirmed: consent,
+    role: String(form.get("role") || "influencer"),
+    language: String(form.get("language") || "es"),
+    brand_name: String(form.get("brand_name") || "").trim() || null,
+    bio: String(form.get("bio") || "").trim() || null,
+    backstory: String(form.get("backstory") || "").trim() || null,
+    voice: String(form.get("voice") || "").trim() || null,
+    values_text: String(form.get("values_text") || "").trim() || null,
+    topics: String(form.get("topics") || "").split(/[,\n]/).map((t) => t.trim()).filter(Boolean).slice(0, 12),
+    audience: String(form.get("audience") || "").trim() || null,
+    dos: String(form.get("dos") || "").trim() || null,
+    donts: String(form.get("donts") || "").trim() || null,
+    locations: String(form.get("locations") || "").trim() || null,
   };
 
   if (id) {
@@ -58,9 +73,83 @@ export async function savePersona(_: ActionResult | null, form: FormData): Promi
     return { ok: true, message: "Persona saved.", id };
   }
   const { data, error } = await supabase.from("personas").insert(row).select("id").single();
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: friendly(error.message) };
   revalidatePath("/app/personas");
   redirect(`/app/personas/${data.id}`);
+}
+
+// ------------------------------------------------------ AI persona + posts
+async function withCredits<T>(kind: string, fn: () => Promise<T>): Promise<{ ok: true; value: T } | { ok: false; error: string }> {
+  const { supabase } = await requireUser();
+  const { data: ledgerId, error } = await supabase.rpc("spend_credits", { p_kind: kind });
+  if (error) return { ok: false, error: friendly(error.message) };
+  try {
+    return { ok: true, value: await fn() };
+  } catch (e) {
+    await supabase.rpc("refund_spend", { p_ledger_id: ledgerId });
+    const msg = (e as Error).message;
+    return { ok: false, error: e instanceof AiConfigError ? msg : `${msg} (credits returned)` };
+  }
+}
+
+export async function createPersonaWithAi(_: ActionResult | null, form: FormData): Promise<ActionResult> {
+  const { supabase } = await requireUser();
+  const brief = String(form.get("brief") || "").trim();
+  const role = String(form.get("role") || "influencer");
+  const language = String(form.get("language") || "es");
+  const brandName = String(form.get("brand_name") || "").trim();
+  if (brief.length < 15) return { ok: false, error: "Describe the persona in at least one full sentence." };
+
+  // check the plan limit before spending credits
+  const { count } = await supabase.from("personas").select("id", { count: "exact", head: true });
+  const { data: me } = await supabase.from("profiles").select("plan:plans(max_personas)").single();
+  const limit = (me?.plan as unknown as { max_personas: number } | null)?.max_personas ?? 1;
+  if ((count ?? 0) >= limit) return { ok: false, error: RPC_ERRORS.persona_limit_reached };
+
+  const r = await withCredits("text_persona", () => draftPersona({ brief, role, language, brandName }));
+  if (!r.ok) return r;
+  const d = r.value;
+  const { data, error } = await supabase
+    .from("personas")
+    .insert({
+      name: d.name, tagline: d.tagline, bio: d.bio, backstory: d.backstory, personality: d.personality,
+      voice: d.voice, values_text: d.values_text, topics: d.topics, audience: d.audience, dos: d.dos,
+      donts: d.donts, locations: d.locations, style_notes: d.style_notes, appearance: d.appearance,
+      identity_prompt: identityFromAppearance(d.appearance),
+      negative_prompt: "blurry, deformed hands, extra fingers, watermark, text",
+      role, language, brand_name: brandName || null, is_fictional: true,
+    })
+    .select("id")
+    .single();
+  if (error) return { ok: false, error: friendly(error.message) };
+  revalidatePath("/app/personas");
+  redirect(`/app/personas/${data.id}?created=ai`);
+}
+
+export async function generatePosts(personaId: string, input: { topic: string; platform: string; count: number }): Promise<ActionResult> {
+  const { supabase } = await requireUser();
+  const { data: persona } = await supabase.from("personas").select("*").eq("id", personaId).single();
+  if (!persona) return { ok: false, error: "Persona not found." };
+  const r = await withCredits("text_posts", () => draftPosts(persona as Persona, input));
+  if (!r.ok) return r;
+  const { error } = await supabase.from("posts").insert(
+    r.value.map((p) => ({ persona_id: personaId, platform: input.platform, topic: input.topic || null, caption: p.caption, hashtags: p.hashtags, image_idea: p.image_idea })),
+  );
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/app/personas/${personaId}/posts`);
+  return { ok: true, message: `${r.value.length} posts written.` };
+}
+
+export async function updatePost(postId: string, patch: { caption?: string; status?: "draft" | "approved" | "published" | "discarded" }): Promise<ActionResult> {
+  const { supabase } = await requireUser();
+  const { error } = await supabase.from("posts").update(patch).eq("id", postId);
+  return error ? { ok: false, error: error.message } : { ok: true };
+}
+
+export async function deletePost(postId: string, personaId: string) {
+  const { supabase } = await requireUser();
+  await supabase.from("posts").delete().eq("id", postId);
+  revalidatePath(`/app/personas/${personaId}/posts`);
 }
 
 export async function deletePersona(id: string) {

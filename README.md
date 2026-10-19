@@ -48,8 +48,15 @@ npm run worker         # sāk apstrādāt darbus
 ```
 Ja ComfyUI ir uz cita porta (portable versija bieži izmanto 8188), nomaini `COMFYUI_URL`.
 
+### 4b. Cloudflare Workers AI (bezmaksas teksti un ātri attēli)
+1. dash.cloudflare.com → **Workers AI** → **Use REST API**: nokopē **Account ID** un izveido **API token** (Workers AI tiesības).
+2. Ieliec `.env.local`: `CLOUDFLARE_ACCOUNT_ID=…`, `CLOUDFLARE_API_TOKEN=…`, `WORKER_PROVIDERS=comfyui,cloudflare`.
+3. Restartē `npm run dev` un `npm run worker`.
+Bezmaksas kvota: 10 000 "neuronu" dienā, tas ir ~150 FLUX schnell attēli vai simtiem personas tekstu.
+
 ### 5. Admin (pēc izvēles)
-Lai redzētu visu lietotāju darbus, SQL Editor: `update profiles set role='admin' where id = '<tavs user id>';`
+Lai redzētu visu lietotāju darbus un iegūtu Business limitus testēšanai, SQL Editor:
+`update profiles set role='admin', plan_id='business' where id = (select id from auth.users where email = 'tavs@epasts');`
 
 ## Workflows
 
@@ -64,6 +71,17 @@ Lai redzētu visu lietotāju darbus, SQL Editor: `update profiles set role='admi
 aizstāj vērtības ar `{{prompt}}`, `{{negative}}`, `{{seed}}`, `{{width}}`, `{{height}}`, `{{steps}}`, `{{cfg}}`, `{{checkpoint}}`,
 `{{reference_image}}`, `{{reference_strength}}` un pievieno ierakstu `src/lib/catalog.ts`.
 Piemēram, IP-Adapter/PuLID workflow ar `{{reference_image}}` dod daudz labāku sejas konsekvenci, bet prasa custom nodes.
+
+## Plāni (hipotēze)
+| Plāns | Cena ar PVN | Personāži | Kredīti/mēn |
+|---|---|---|---|
+| Free | €0 | 1 | 30 reģistrējoties |
+| Starter | €29,99 | 1 | 400 |
+| Pro | €69,99 | 5 | 1 200 |
+| Business | €109,99 | 10 | 1 800 |
+
+Personāžu limitu nodrošina datubāzes trigeris. Kredītus noņem `enqueue_job` (attēli) un `spend_credits` (AI teksti), un tehniskas kļūdas gadījumā tos atgriež.
+Papildu pakas ir tabulā `credit_packs`. Stripe maksājumi un mēneša kredītu atjaunošana būs nākamajā solī.
 
 ## Kredīti un cenas
 Cenas un kredīti dzīvo datubāzē, ne kodā: tabulas `generation_costs`, `plans`, `app_settings` (`signup_bonus_credits`).

@@ -1,15 +1,17 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/supabase/server";
-import { SCORE_CRITERIA, workflowById, type Persona } from "@/lib/catalog";
+import { ROLES, SCORE_CRITERIA, workflowById, type Persona } from "@/lib/catalog";
+import { PersonaTabs } from "./tabs";
 import { BENCHMARK_SCENES } from "@/lib/benchmark";
 import { PersonaForm } from "../persona-form";
 import { References } from "./references";
 import { BenchmarkLauncher } from "./benchmark-launcher";
 import { deletePersona } from "../../actions";
 
-export default async function PersonaPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function PersonaPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<Record<string, string>> }) {
   const { id } = await params;
+  const sp = await searchParams;
   const { supabase } = await requireUser();
   const { data: persona } = await supabase.from("personas").select("*").eq("id", id).maybeSingle();
   if (!persona) notFound();
@@ -59,7 +61,36 @@ export default async function PersonaPage({ params }: { params: Promise<{ id: st
           <h1 className="text-5xl font-extrabold">{persona.name}</h1>
           <Link href={`/app/studio?persona=${id}`} className="btn btn-primary">Shoot with {persona.name}</Link>
         </div>
+        <p className="mt-2 text-muted">
+          {ROLES.find((r) => r.id === persona.role)?.label ?? "Influencer"}
+          {persona.brand_name ? ` for ${persona.brand_name}` : ""}
+          {persona.tagline ? `. ${persona.tagline}` : ""}
+        </p>
+        <PersonaTabs id={id} />
+        {sp.created === "ai" && (
+          <p role="status" className="mt-4 rounded-lg bg-paper p-3 text-sm ring-1 ring-ok/40">
+            {persona.name} is ready. Read the profile below and change anything that does not fit, then add a reference photo or shoot a first portrait.
+          </p>
+        )}
       </div>
+
+      {(persona.bio || persona.voice) && (
+        <section className="grid gap-6 rounded-xl bg-paper p-6 ring-1 ring-line md:grid-cols-[1.4fr_1fr]">
+          <div>
+            <h2 className="text-sm text-muted">In their words</h2>
+            <p className="mt-2 text-xl leading-relaxed">{persona.bio}</p>
+          </div>
+          <dl className="space-y-3 text-sm">
+            {persona.voice && (<div><dt className="text-muted">Voice</dt><dd>{persona.voice}</dd></div>)}
+            {!!persona.topics?.length && (
+              <div><dt className="text-muted">Talks about</dt>
+                <dd className="mt-1 flex flex-wrap gap-1">{persona.topics.map((t: string) => <span key={t} className="rounded-full bg-backdrop px-2 py-0.5">{t}</span>)}</dd>
+              </div>
+            )}
+            {persona.audience && (<div><dt className="text-muted">Audience</dt><dd>{persona.audience}</dd></div>)}
+          </dl>
+        </section>
+      )}
 
       <References
         personaId={id}

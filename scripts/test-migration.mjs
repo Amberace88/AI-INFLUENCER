@@ -116,3 +116,35 @@ assert.equal(bUpd.rows.length, 0, "B cannot review A's asset");
 await assert.rejects(as(A, `update profiles set role='admin' where id=$1`, [A]), /permission denied/);
 
 console.log("✓ all database checks passed");
+
+// ---- migration 2: plans, persona limit, spend/refund, posts ----
+await db.exec(`grant select, insert, update, delete on all tables in schema public to authenticated, service_role;
+  revoke update on public.profiles from authenticated; grant update (display_name) on public.profiles to authenticated;`);
+const C = "33333333-3333-3333-3333-333333333333";
+await db.exec(`insert into auth.users (id, email) values ('${C}','c@test.dev')`);
+assert.equal((await as(C, `select plan_id from profiles where id=$1`, [C])).rows[0].plan_id, "free");
+await as(C, `insert into personas (name) values ('One')`);
+await assert.rejects(as(C, `insert into personas (name) values ('Two')`), /persona_limit_reached/);
+await asService(`update profiles set plan_id='pro' where id=$1`, [C]);
+for (let i = 2; i <= 5; i++) await as(C, `insert into personas (name) values ('P${i}')`);
+await assert.rejects(as(C, `insert into personas (name) values ('P6')`), /persona_limit_reached/);
+// users cannot upgrade themselves
+await assert.rejects(as(C, `update profiles set plan_id='business' where id=$1`, [C]), /permission denied/);
+console.log("✓ persona limits per plan");
+
+const b0 = await balance(C);
+const spend = await as(C, `select spend_credits('text_persona') as id`);
+assert.equal(await balance(C), b0 - 2);
+await as(C, `select refund_spend($1)`, [spend.rows[0].id]);
+await as(C, `select refund_spend($1)`, [spend.rows[0].id]); // idempotent
+assert.equal(await balance(C), b0, "refund once");
+await assert.rejects(as(B, `select refund_spend($1)`, [spend.rows[0].id]), /spend_not_found/);
+console.log("✓ spend / refund credits");
+
+const pc = (await as(C, `select id from personas limit 1`)).rows[0].id;
+await as(C, `insert into posts (persona_id, caption) values ($1, 'Hola!')`, [pc]);
+assert.equal((await as(B, `select * from posts`)).rows.length, 0, "B cannot see C's posts");
+await assert.rejects(as(B, `insert into posts (persona_id, caption) values ($1, 'hack')`, [pc]), /row-level security/);
+await as(C, `select enqueue_job($1,'image_fast','cloudflare','cf_flux_schnell','a cloud job')`, [pc]);
+console.log("✓ posts RLS + cloudflare provider");
+console.log("✓ migration 2 checks passed");

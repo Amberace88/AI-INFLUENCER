@@ -9,11 +9,11 @@ import { generate } from "../actions";
 const QUICK = BENCHMARK_SCENES.filter((s) => ["cafe_indoor", "beach_golden", "night_neon", "product_bottle", "selfie", "gym"].includes(s.key));
 
 export function GenerateForm({
-  personas, personasWithRefs, costs, initialPersona,
-}: { personas: Persona[]; personasWithRefs: string[]; costs: Record<string, number>; initialPersona: string }) {
+  personas, personasWithRefs, costs, initialPersona, initialScene,
+}: { personas: Persona[]; personasWithRefs: string[]; costs: Record<string, number>; initialPersona: string; initialScene: string }) {
   const [personaId, setPersonaId] = useState(initialPersona);
   const [workflowId, setWorkflowId] = useState(WORKFLOWS[0].id);
-  const [scene, setScene] = useState("");
+  const [scene, setScene] = useState(initialScene.slice(0, 1500));
   const [negative, setNegative] = useState("");
   const [sizeId, setSizeId] = useState("portrait");
   const [count, setCount] = useState(1);

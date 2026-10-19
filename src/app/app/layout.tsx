@@ -6,7 +6,12 @@ export const dynamic = "force-dynamic";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const { supabase, user } = await requireUser();
-  const { data: bal } = await supabase.from("credit_balances").select("balance").eq("owner_id", user.id).maybeSingle();
+  const [{ data: bal }, { data: me }, { count: personaCount }] = await Promise.all([
+    supabase.from("credit_balances").select("balance").eq("owner_id", user.id).maybeSingle(),
+    supabase.from("profiles").select("plan:plans(name, max_personas)").eq("id", user.id).maybeSingle(),
+    supabase.from("personas").select("id", { count: "exact", head: true }),
+  ]);
+  const plan = me?.plan as unknown as { name: string; max_personas: number } | null;
 
   return (
     <div className="min-h-dvh md:grid md:grid-cols-[220px_1fr]">
@@ -16,6 +21,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <div className="text-sm md:mt-6">
             <span className="text-2xl font-bold tabular-nums">{bal?.balance ?? 0}</span>
             <span className="ml-1 text-muted">credits</span>
+            {plan && (
+              <p className="text-xs text-muted">
+                {plan.name} plan · {personaCount ?? 0}/{plan.max_personas} persona{plan.max_personas === 1 ? "" : "s"}
+              </p>
+            )}
           </div>
         </div>
         <Nav />
