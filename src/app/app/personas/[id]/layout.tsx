@@ -54,7 +54,7 @@ export default async function PersonaLayout({ children, params }: { children: Re
         className="guilloche mt-4 grid overflow-hidden rounded-[22px] bg-paper ring-1 ring-line md:grid-cols-[minmax(220px,300px)_1fr]">
         {/* Portrait in a film frame */}
         <div className="bg-ink p-3 pb-9 md:p-4 md:pb-10">
-          <div className="relative aspect-[3/4] overflow-hidden rounded-[3px] bg-[#222c38]">
+          <div className="relative mx-auto aspect-[3/4] w-full overflow-hidden rounded-[3px] bg-[#222c38] max-md:max-w-[220px]">
             {photo ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={photo} alt={`${p.name}, main reference photo`} className="developing h-full w-full object-cover" />
@@ -67,7 +67,7 @@ export default async function PersonaLayout({ children, params }: { children: Re
               </Link>
             )}
           </div>
-          <p className="relative mt-2.5 flex justify-between text-[0.72rem] tabular-nums text-safelight">
+          <p className="relative mx-auto mt-2.5 flex justify-between text-[0.72rem] tabular-nums text-safelight max-md:max-w-[220px]">
             <span>01 · {role}</span>
             <span>{frames} frames</span>
           </p>
