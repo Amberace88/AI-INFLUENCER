@@ -41,7 +41,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               <p className="mt-2.5 hidden items-center gap-1.5 text-xs text-[#9eabb9] md:flex">
                 <span>{plan.name}</span>
                 <span aria-hidden className="h-3 w-px bg-white/15" />
-                <span className="tabular-nums">{personaCount ?? 0} of {plan.max_personas} persona{plan.max_personas === 1 ? "" : "s"}</span>
+                <span className="tabular-nums">{personaCount ?? 0}/{plan.max_personas} personas</span>
                 {isAdmin && <span className="ml-auto rounded bg-safelight px-1.5 py-px text-[10px] font-bold text-ink">Admin</span>}
               </p>
             )}

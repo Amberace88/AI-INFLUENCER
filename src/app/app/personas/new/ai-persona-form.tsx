@@ -18,11 +18,12 @@ export function AiPersonaForm({ cost, configured }: { cost: number; configured: 
   return (
     <form action={action} className="space-y-6">
       <div>
-        <label className="label" htmlFor="brief">Describe who you need, in your own words</label>
+        <label className="mb-2 block text-lg font-bold" htmlFor="brief">Who do you need?</label>
         <textarea id="brief" name="brief" rows={4} required minLength={15} maxLength={2000} className="field text-lg"
           value={brief} onChange={(e) => setBrief(e.target.value)}
           placeholder="Who is this person, what do they do, who do they talk to, what should they promote?" />
-        <div className="mt-2 flex flex-wrap gap-2">
+        <p className="mt-3 text-xs text-muted">Or start from an example:</p>
+        <div className="mt-1.5 flex flex-wrap gap-2">
           {EXAMPLES.map((ex) => (
             <button key={ex} type="button" onClick={() => setBrief(ex)}
               className="rounded-full bg-paper px-3 py-1 text-left text-xs text-muted ring-1 ring-line hover:text-ink hover:ring-ink">
@@ -33,10 +34,10 @@ export function AiPersonaForm({ cost, configured }: { cost: number; configured: 
       </div>
 
       <fieldset>
-        <legend className="label">Their job</legend>
+        <legend className="mb-2 text-lg font-bold">Their job</legend>
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {ROLES.map((r) => (
-            <label key={r.id} className={`cursor-pointer rounded-lg border p-3 ${role === r.id ? "border-accent bg-paper ring-1 ring-accent" : "border-line bg-paper/60 hover:border-ink"}`}>
+            <label key={r.id} className={`cursor-pointer rounded-xl p-3.5 transition-shadow ${role === r.id ? "bg-paper ring-2 ring-accent" : "bg-paper/60 ring-1 ring-line hover:ring-ink"}`}>
               <input type="radio" name="role" value={r.id} checked={role === r.id} onChange={() => setRole(r.id)} className="sr-only" />
               <span className="font-semibold">{r.label}</span>
               <span className="mt-0.5 block text-sm text-muted">{r.hint}</span>
@@ -63,7 +64,7 @@ export function AiPersonaForm({ cost, configured }: { cost: number; configured: 
           {pending ? "Writing the persona…" : "Create persona with AI"}
         </button>
         <span className="text-sm tabular-nums text-muted">{cost} credits</span>
-        {pending && <span className="text-sm text-muted">Usually 10–30 seconds.</span>}
+        {pending && <span className="flex items-center gap-2 text-sm text-muted"><span className="size-2 animate-pulse rounded-full bg-accent" aria-hidden />Writing name, voice, look and rules. Usually 10–30 seconds.</span>}
       </div>
       {!configured && (
         <p className="text-sm text-warn">AI text is not connected yet. Add CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN to .env.local (see README).</p>

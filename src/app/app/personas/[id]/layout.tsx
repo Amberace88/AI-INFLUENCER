@@ -82,11 +82,11 @@ export default async function PersonaLayout({ children, params }: { children: Re
           <h1 className="condensed mt-2 text-[clamp(2.6rem,6vw,4.6rem)] font-extrabold leading-[0.95]">{p.name}</h1>
           {p.tagline && <p className="mt-3 max-w-[56ch] text-lg text-muted">{p.tagline}</p>}
 
-          <dl className="mt-7 grid grid-cols-2 gap-x-6 gap-y-4 border-t border-line pt-5 text-sm sm:grid-cols-3 lg:grid-cols-5">
+          <dl className="mt-7 grid grid-cols-2 gap-x-6 gap-y-4 border-t border-line pt-5 text-sm sm:grid-cols-3 2xl:grid-cols-5">
             {facts.map(([k, v]) => (
               <div key={k} className="min-w-0">
                 <dt className="text-xs text-muted">{k}</dt>
-                <dd className="mt-0.5 truncate font-semibold" title={v}>{v}</dd>
+                <dd className="mt-0.5 font-semibold leading-snug">{v}</dd>
               </div>
             ))}
           </dl>
