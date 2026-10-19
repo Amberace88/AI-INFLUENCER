@@ -171,6 +171,16 @@ async function spendGuardBlocks(): Promise<boolean> {
   return (guardBlocked = blocked);
 }
 
+/** Plans given by the admin (no card) renew monthly here; Stripe plans renew from the invoice webhook. */
+let renewCheckedAt = 0;
+async function renewManualPlans() {
+  if (Date.now() - renewCheckedAt < 10 * 60_000) return;
+  renewCheckedAt = Date.now();
+  const { data, error } = await db.rpc("renew_due_plans");
+  if (error) log(`plan renewal unavailable: ${error.message}`);
+  else if (Number(data) > 0) log(`↻ renewed ${data} plan(s) with fresh monthly credits`);
+}
+
 let stopping = false;
 process.on("SIGINT", () => { if (stopping) process.exit(1); stopping = true; log("stopping after current job… (Ctrl+C again to force)"); });
 process.on("SIGTERM", () => { stopping = true; });
@@ -191,6 +201,7 @@ async function main() {
   await spendGuardBlocks();
   log(`waiting for jobs… (daily spend so far ${guardBlocked ? "over limit" : "under limit"})`);
   while (!stopping) {
+    await renewManualPlans();
     // paid cloud providers pause when the daily limit is hit; local ComfyUI keeps working
     const blocked = await spendGuardBlocks();
     const usable = blocked ? config.providers.filter((p) => p === "comfyui") : config.providers;

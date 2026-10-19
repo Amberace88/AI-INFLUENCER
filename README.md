@@ -84,7 +84,24 @@ Piemēram, IP-Adapter/PuLID workflow ar `{{reference_image}}` dod daudz labāku 
 | Business | €109,99 | 10 | 1 800 |
 
 Personāžu limitu nodrošina datubāzes trigeris. Kredītus noņem `enqueue_job` (attēli) un `spend_credits` (AI teksti), un tehniskas kļūdas gadījumā tos atgriež.
-Papildu pakas ir tabulā `credit_packs`. Stripe maksājumi un mēneša kredītu atjaunošana būs nākamajā solī.
+Papildu pakas ir tabulā `credit_packs`.
+
+### Kā kredīti strādā (kā Claude limiti)
+- **Mēneša kredīti:** perioda sākumā plāns piešķir `monthly_credits` (`plan_credits:<plāns>`). Tos tērē pirmos, un neizlietotie perioda beigās sadeg (`plan_expire`).
+- **Papildu kredīti:** reģistrācijas bonuss, nopirktās pakas (`pack:<id>`) un admin piešķirtie kredīti. Tie paliek, līdz tos izlieto.
+- Admin piešķirtam plānam (`plan_status = manual`) worker pats atjauno periodu ik mēnesi (`renew_due_plans`). Stripe plānu atjauno `invoice.paid` webhook.
+- Klients visu redz lapā **Plan & credits** (`/app/billing`): plānu, atjaunošanas datumu, mēneša un papildu kredītus un pilnu vēsturi.
+
+## Stripe maksājumi (testa režīmā)
+1. Izveido kontu [dashboard.stripe.com](https://dashboard.stripe.com) un atstāj ieslēgtu **Test mode**.
+2. Atver Developers → API keys un iekopē **Secret key** (`sk_test_…`) savā `.env.local` kā `STRIPE_SECRET_KEY`. Čatā to nesūti.
+3. Webhook lokāli: `brew install stripe/stripe-cli/stripe`, `stripe login`, pēc tam
+   `stripe listen --forward-to localhost:3000/api/stripe/webhook`. Nokopē izdrukāto `whsec_…` uz `.env.local` kā `STRIPE_WEBHOOK_SECRET` un pārstartē `npm run dev`. `stripe listen` atstāj atvērtu atsevišķā terminālī.
+4. Stripe produktus nav jāveido ar roku. Plāna cena tiek izveidota pirmajā pirkumā (lookup key `persona_<plāns>_<centi>_eur_month`), un pakām cena tiek padota maksājuma brīdī.
+5. Klienta portālam (kartes maiņa, rēķini, atcelšana) vienreiz atver Settings → Billing → Customer portal un spied **Save**.
+6. Testa karte: `4242 4242 4242 4242`, jebkurš nākotnes datums, jebkurš CVC.
+
+Apstrādātie notikumi ir `checkout.session.completed`, `invoice.paid` (`subscription_cycle`), `customer.subscription.updated` un `customer.subscription.deleted`. Katrs tiek apstrādāts tikai vienreiz (tabula `billing_events`).
 
 ## Digitālais dvīnis
 Personas → New → **Make one of me**: klients augšupielādē 1–4 savas bildes un apstiprina trīs punktus (bildes ir viņa, ir 18+, marķēs saturu kā AI).
@@ -111,7 +128,7 @@ npm run build
 ```
 
 ## Kas vēl NAV gatavs (apzināti)
-- Maksājumi/abonementi (Stripe). Pievienojam pēc pilota.
+- Stripe produkcijas režīms: PVN pēc klienta valsts (Stripe Tax), rēķinu rekvizīti uzņēmumiem, produkcijas webhook pēc hostinga.
 - Video ģenerēšana. Vispirms jāizmēra cena par derīgu klipu.
 - Sejas konsekvence ar LoRA treniņu (fal `flux-lora-fast-training`) vai IP-Adapter/PuLID ComfyUI workflow.
 - Hostings (Cloudflare) un e-pasta veidnes.

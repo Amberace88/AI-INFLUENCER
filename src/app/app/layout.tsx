@@ -24,7 +24,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <aside className="z-30 border-b border-line bg-paper md:sticky md:top-0 md:flex md:h-dvh md:flex-col md:border-r md:border-b-0">
         <div className="flex items-center justify-between gap-4 px-5 py-4 md:block md:py-6">
           <Link href="/app/home" aria-label="Persona Studio home"><Logo /></Link>
-          <div className="text-sm md:mt-7 md:rounded-xl md:bg-backdrop md:p-3">
+          <Link href="/app/billing" title="Plan & credits" className="block text-sm transition-colors md:mt-7 md:rounded-xl md:bg-backdrop md:p-3 md:hover:bg-line/60">
             <div className="flex items-baseline gap-1">
               <span className="text-2xl font-bold tabular-nums">{balance}</span>
               <span className="text-muted">credits</span>
@@ -38,7 +38,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                 {isAdmin && <span className="ml-1 rounded bg-ink px-1.5 py-0.5 text-[10px] font-semibold text-[#e6c86e]">ADMIN</span>}
               </p>
             )}
-          </div>
+          </Link>
         </div>
         <Nav isAdmin={isAdmin} />
         <form action={signOut} className="mt-auto hidden px-5 pb-6 md:block">

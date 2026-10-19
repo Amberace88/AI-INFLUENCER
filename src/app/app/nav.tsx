@@ -10,6 +10,7 @@ const LINKS: { href: string; label: string; icon: IconName }[] = [
   { href: "/app/studio", label: "Studio", icon: "studio" },
   { href: "/app/sheet", label: "Contact sheet", icon: "sheet" },
   { href: "/app/jobs", label: "Jobs & metrics", icon: "jobs" },
+  { href: "/app/billing", label: "Plan & credits", icon: "card" },
 ];
 
 export function Nav({ isAdmin }: { isAdmin: boolean }) {

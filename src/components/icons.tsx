@@ -11,6 +11,7 @@ const P = {
   pen: "M4 20h4L19 9l-4-4L4 16zM14 6l4 4",
   logout: "M15 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4M10 17l5-5-5-5M15 12H3",
   arrow: "M5 12h14M13 6l6 6-6 6",
+  card: "M3 6a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1zM3 10h18M7 15h4",
 } as const;
 
 export type IconName = keyof typeof P;

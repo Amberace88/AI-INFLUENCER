@@ -219,3 +219,50 @@ console.log("✓ twin: paid plan only, one per account, consent stored");
   await assert.rejects(as(A, `select worker_spend_today()`), /permission denied/);
   console.log("✓ economics: credit floor after VAT + fees, margin rule, daily limit");
 }
+
+// ---- migration 7: billing ----
+{
+  const F = "66666666-6666-6666-6666-666666666666";
+  await db.exec(`insert into auth.users (id, email) values ('${F}','f@test.dev')`);
+  const bal = () => balance(F);
+  assert.equal(await bal(), 30, "bonus only");
+  // admin gives Pro → 1200 plan credits now
+  await as(A, `select admin_set_plan($1, 'pro')`, [F]);
+  assert.equal(await bal(), 1230);
+  let b = (await as(F, `select my_billing() as b`)).rows[0].b;
+  assert.equal(b.plan_id, "pro"); assert.equal(b.status, "manual");
+  assert.equal(b.plan_left, 1200); assert.equal(b.extra, 30);
+  assert.ok(b.renews_at, "renewal date set");
+  // spend 200 (plan credits are used first), get one refund of 2
+  let lastSpend;
+  for (let i = 0; i < 100; i++) lastSpend = (await as(F, `select spend_credits('text_posts') as id`)).rows[0].id;
+  await as(F, `select refund_spend($1)`, [lastSpend]);
+  b = (await as(F, `select my_billing() as b`)).rows[0].b;
+  assert.equal(b.plan_left, 1002, "200 spent, 2 refunded");
+  assert.equal(b.balance, 1032);
+  // a bought pack is extra credit; it survives the month
+  assert.equal((await asService(`select billing_pack_paid('evt_pack1', $1, 'pack_200', 'cus_1') as ok`, [F])).rows[0].ok, true);
+  assert.equal((await asService(`select billing_pack_paid('evt_pack1', $1, 'pack_200', 'cus_1') as ok`, [F])).rows[0].ok, false, "webhook idempotent");
+  assert.equal(await bal(), 1232);
+  // month passes: unused 1002 plan credits expire, a fresh 1200 arrive, extra 230 stay
+  await asService(`update profiles set plan_renews_at = now() - interval '1 minute' where id=$1`, [F]);
+  assert.equal((await asService(`select renew_due_plans() as n`)).rows[0].n, 1);
+  b = (await as(F, `select my_billing() as b`)).rows[0].b;
+  assert.equal(b.plan_left, 1200); assert.equal(b.extra, 230); assert.equal(b.balance, 1430);
+  assert.equal((await asService(`select renew_due_plans() as n`)).rows[0].n, 0, "not renewed twice");
+  // Stripe subscription: Business via webhook, then canceled → Free, plan credits gone, extra kept
+  await asService(`select billing_subscription_period('evt_sub1', $1, 'business', 'cus_1', 'sub_1', now() + interval '1 month')`, [F]);
+  b = (await as(F, `select my_billing() as b`)).rows[0].b;
+  assert.equal(b.plan_id, "business"); assert.equal(b.status, "active"); assert.equal(b.plan_left, 1800); assert.equal(b.extra, 230);
+  assert.equal((await asService(`select billing_subscription_status('evt_pd', 'sub_1', 'past_due') as ok`)).rows[0].ok, true);
+  assert.equal((await as(F, `select my_billing() as b`)).rows[0].b.status, "past_due");
+  await asService(`select billing_subscription_status('evt_cancel', 'sub_1', 'canceled')`);
+  b = (await as(F, `select my_billing() as b`)).rows[0].b;
+  assert.equal(b.plan_id, "free"); assert.equal(b.plan_left, 0); assert.equal(b.balance, 230);
+  // clients cannot touch billing
+  await assert.rejects(as(F, `select start_plan_period($1, 'business', 'active')`, [F]), /permission denied/);
+  await assert.rejects(as(F, `select billing_pack_paid('x', $1, 'pack_600', null)`, [F]), /permission denied/);
+  await assert.rejects(as(F, `update profiles set plan_id='business' where id=$1`, [F]), /permission denied/);
+  await assert.rejects(as(F, `select renew_due_plans()`), /permission denied/);
+  console.log("✓ billing: plan credits monthly, unused expire, packs kept, Stripe webhooks idempotent");
+}
