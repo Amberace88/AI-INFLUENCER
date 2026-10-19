@@ -15,9 +15,12 @@ export function LoginForm({ initialMode, next, linkError }: { initialMode: "sign
   const current = MODES.find((m) => m.id === mode)!;
 
   return (
-    <form action={action} className="mt-8 space-y-4">
-      <h1 className="text-3xl font-bold">{mode === "signup" ? "Create your studio" : "Welcome back"}</h1>
-      <div role="tablist" className="flex gap-1 rounded-full border border-line bg-paper p-1 text-sm">
+    <form action={action} className="mt-8 space-y-5">
+      <div>
+        <h1 className="condensed text-[2.6rem] font-extrabold leading-none">{mode === "signup" ? "Open your studio" : "Welcome back"}</h1>
+        <p className="mt-2 text-muted">{mode === "signup" ? "30 free credits to cast your first persona. No card needed." : mode === "magic" ? "We email you a link; no password needed." : "Sign in to your personas, photos and posts."}</p>
+      </div>
+      <div role="tablist" className="flex gap-1 rounded-full bg-paper p-1 text-sm ring-1 ring-line">
         {MODES.map((m) => (
           <button
             key={m.id}
@@ -46,7 +49,7 @@ export function LoginForm({ initialMode, next, linkError }: { initialMode: "sign
       )}
       {state?.error && <p role="alert" className="text-sm text-bad">{state.error}</p>}
       {state?.message && <p role="status" className="text-sm text-ok">{state.message}</p>}
-      <button className="btn btn-primary w-full" disabled={pending}>{pending ? "Working…" : current.button}</button>
+      <button className="btn btn-primary w-full py-3 text-base" disabled={pending}>{pending ? "Working…" : current.button}</button>
     </form>
   );
 }
