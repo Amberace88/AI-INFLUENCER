@@ -70,7 +70,8 @@ async function main() {
   const k = await cloudflareProvider.run({ ...job, workflow: "cf_klein_ref", params: { width: 832, height: 1248, seed: 7 } }, { references: refs, onProgress: () => {}, log: () => {} });
   assert.match(lastForm.contentType, /multipart\/form-data/);
   assert.deepEqual(lastForm.fields.sort(), ["height", "input_image_0", "input_image_1", "prompt", "seed", "width"]);
-  assert.match(lastForm.prompt, /images 0-1 is the subject/);
+  assert.match(lastForm.prompt, /person shown in images 0-1/);
+  assert.match(lastForm.prompt, /Do NOT copy the background/);
   assert.ok((k.costUsd ?? 0) > 0.014 && (k.costUsd ?? 1) < 0.02, `klein cost ${k.costUsd}`);
   await assert.rejects(cloudflareProvider.run({ ...job, workflow: "cf_klein_ref" }, { references: [], onProgress: () => {}, log: () => {} }), PermanentError);
   console.log("✓ cloudflare klein with references");

@@ -8,11 +8,12 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "worker": "tsx worker/index.ts",
+    "worker": "tsx watch --clear-screen=false worker/index.ts",
     "worker:check": "tsx worker/index.ts --check",
     "test:db": "node scripts/test-migration.mjs",
     "test:worker": "tsx worker/test-comfyui.ts && tsx worker/test-cloudflare.ts",
-    "test": "npm run test:db && npm run test:worker && tsx scripts/test-json.ts"
+    "test": "npm run test:db && npm run test:worker && tsx scripts/test-json.ts",
+    "worker:once": "tsx worker/index.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

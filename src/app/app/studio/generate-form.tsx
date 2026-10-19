@@ -29,7 +29,7 @@ export function GenerateForm({
   const persona = personas.find((p) => p.id === personaId) ?? null;
   const wf = WORKFLOWS.find((w) => w.id === workflowId)!;
   const dims = sizeFor(wf, sizeId);
-  const preview = useMemo(() => composePrompt(persona, scene || "…your scene…", realism), [persona, scene, realism]);
+  const preview = useMemo(() => composePrompt(persona, scene || "…your scene…", realism, wf.needsReference), [persona, scene, realism, wf.needsReference]);
   const missingRef = wf.needsReference && (!persona || !personasWithRefs.includes(persona.id));
   const credits = (costs[wf.kind] ?? 0) * count;
 

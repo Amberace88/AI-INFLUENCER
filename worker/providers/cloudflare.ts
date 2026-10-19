@@ -106,11 +106,14 @@ export const cloudflareProvider: Provider = {
       inputMp += (small.width * small.height) / 1_000_000;
       form.append(`input_image_${i}`, new Blob([new Uint8Array(small.data)], { type: "image/jpeg" }), `ref${i}.jpg`);
     }
-    const refNote = refs.length
-      ? `The person in ${refs.length === 1 ? "image 0" : `images 0-${refs.length - 1}`} is the subject: keep exactly the same face, facial features, skin, hair and any distinctive marks. `
-      : "";
+    const imgs = refs.length === 1 ? "image 0" : `images 0-${refs.length - 1}`;
     const avoid = job.negative_prompt ? ` Avoid: ${job.negative_prompt}.` : "";
-    form.append("prompt", `${refNote}${job.prompt}.${avoid}`.slice(0, 2048));
+    const prompt = refs.length
+      ? `A completely new photograph of the person shown in ${imgs}. Scene: ${job.prompt}. ` +
+        `Use ${imgs} ONLY to keep the person's identity: same face, facial features, skin tone, hair and distinctive marks. ` +
+        `Do NOT copy the background, room, clothing, pose, framing or lighting of ${imgs}; follow the scene description for all of those.${avoid}`
+      : `${job.prompt}.${avoid}`;
+    form.append("prompt", prompt.slice(0, 2048));
     form.append("width", String(width));
     form.append("height", String(height));
     form.append("seed", String(seed));

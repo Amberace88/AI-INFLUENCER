@@ -56,6 +56,7 @@ export function LiveQueue({ userId, initial, personaNames }: { userId: string; i
 
   // keep in sync with props after server revalidation (new jobs queued from the form)
   useEffect(() => {
+    for (const j of initial) if (!known.current.has(j.id)) known.current.set(j.id, j.status);
     setJobs((cur) => {
       const map = new Map(cur.map((j) => [j.id, j]));
       for (const j of initial) if (!map.has(j.id)) map.set(j.id, j);
@@ -91,7 +92,7 @@ export function LiveQueue({ userId, initial, personaNames }: { userId: string; i
     // fallback poll in case realtime is not enabled on the project
     const t = setInterval(() => {
       if ([...known.current.values()].some((s) => s === "queued" || s === "running")) void refresh();
-    }, 4000);
+    }, 2500);
     return () => { clearInterval(t); void supabase.removeChannel(channel); };
   }, [userId, loadThumbs]);
 

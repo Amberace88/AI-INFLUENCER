@@ -90,7 +90,7 @@ export const WORKFLOWS: Workflow[] = [
 
 /** Added to every photo prompt so results look like real photos, not stock or CGI. */
 export const REALISM =
-  "candid natural photograph, relaxed genuine expression, believable everyday pose, hands relaxed at the sides or out of frame, " +
+  "candid natural photograph, relaxed genuine expression, believable everyday pose, natural hand positions, " +
   "real skin texture with visible pores, natural soft light, shot on a full-frame camera with a 35mm lens, shallow depth of field, subtle film grain";
 export const REALISM_AVOID =
   "plastic or airbrushed skin, waxy face, exaggerated grin, stock-photo pose, hands raised in front of the body, extra fingers, CGI, 3D render, cartoon, oversaturated, HDR, watermark, text";
@@ -190,8 +190,9 @@ export function identityFromAppearance(a: Record<string, string>) {
   return parts.join(", ");
 }
 
-export function composePrompt(persona: Pick<Persona, "identity_prompt" | "style_notes"> | null, scene: string, realism = true) {
-  return [persona?.identity_prompt, scene.trim(), persona?.style_notes, realism ? REALISM : ""].filter((s) => s && s.trim()).join(", ");
+/** With a face reference the identity comes from the photo, so the written appearance (which may describe an outfit) is left out. */
+export function composePrompt(persona: Pick<Persona, "identity_prompt" | "style_notes"> | null, scene: string, realism = true, fromReference = false) {
+  return [fromReference ? "" : persona?.identity_prompt, scene.trim(), persona?.style_notes, realism ? REALISM : ""].filter((s) => s && s.trim()).join(", ");
 }
 
 export function composeNegative(persona: Pick<Persona, "negative_prompt"> | null, extra: string, realism = true) {

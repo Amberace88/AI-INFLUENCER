@@ -244,7 +244,7 @@ export async function generate(input: GenerateInput): Promise<ActionResult> {
 
   const { width, height } = sizeFor(wf, input.sizeId);
   const realism = input.realism !== false;
-  const prompt = composePrompt(persona, input.scene, realism);
+  const prompt = composePrompt(persona, input.scene, realism, wf.needsReference);
   const negative = composeNegative(persona, input.negative, realism);
   const count = Math.min(Math.max(1, Math.round(input.count)), 4);
   const baseSeed = input.seed ?? Math.floor(Math.random() * 2 ** 31 - 10);
@@ -297,7 +297,7 @@ export async function runBenchmark(personaId: string, workflowId: string): Promi
       p_kind: wf.kind,
       p_provider: wf.provider,
       p_workflow: wf.id,
-      p_prompt: composePrompt(persona as Persona, scene.prompt),
+      p_prompt: composePrompt(persona as Persona, scene.prompt, true, wf.needsReference),
       p_negative_prompt: composeNegative(persona as Persona, ""),
       p_params: { width, height, seed: BENCHMARK_BASE_SEED + i, steps: wf.defaults.steps, cfg: wf.defaults.cfg, use_references: wf.needsReference, scene: scene.prompt },
       p_benchmark_run_id: run.id,
