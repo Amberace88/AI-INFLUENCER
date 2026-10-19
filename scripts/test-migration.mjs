@@ -12,7 +12,7 @@ const db = new PGlite();
 await db.exec(`
   create role anon nologin; create role authenticated nologin; create role service_role nologin bypassrls;
   create schema auth; create schema storage;
-  create table auth.users (id uuid primary key, email text, raw_user_meta_data jsonb default '{}'::jsonb);
+  create table auth.users (id uuid primary key, email text, raw_user_meta_data jsonb default '{}'::jsonb, created_at timestamptz default now(), last_sign_in_at timestamptz);
   create function auth.uid() returns uuid language sql stable as
     $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
   create table storage.buckets (id text primary key, name text, public boolean, file_size_limit bigint, allowed_mime_types text[]);
@@ -148,3 +148,21 @@ await assert.rejects(as(B, `insert into posts (persona_id, caption) values ($1, 
 await as(C, `select enqueue_job($1,'image_fast','cloudflare','cf_flux_schnell','a cloud job')`, [pc]);
 console.log("✓ posts RLS + cloudflare provider");
 console.log("✓ migration 2 checks passed");
+
+// ---- migration 3: admin ----
+await assert.rejects(as(A, `select admin_overview()`), /not_admin/);
+await asService(`update profiles set role='admin' where id=$1`, [A]);
+await assert.rejects(asService(`update profiles set role='admin' where id=$1`, [B]), /duplicate key|unique/);
+const ov = (await as(A, `select admin_overview() as o`)).rows[0].o;
+assert.ok(ov.users >= 3 && ov.personas >= 1, "overview counts");
+const users = (await as(A, `select * from admin_list_users()`)).rows;
+assert.ok(users.some((u) => u.email === "b@test.dev"), "admin sees emails");
+await as(A, `select admin_set_plan($1, 'business')`, [B]);
+assert.equal((await asService(`select plan_id from profiles where id=$1`, [B])).rows[0].plan_id, "business");
+const bb = await balance(B);
+await as(A, `select admin_grant_credits($1, 100, 'pilot')`, [B]);
+assert.equal(await balance(B), bb + 100);
+await assert.rejects(as(B, `select admin_grant_credits($1, 100)`, [B]), /not_admin/);
+await assert.rejects(as(B, `select * from admin_list_users()`), /not_admin/);
+assert.ok((await as(A, `select count(*)::int c from personas`)).rows[0].c >= 6, "admin reads all personas");
+console.log("✓ admin: single admin, overview, users, plans, credits");
