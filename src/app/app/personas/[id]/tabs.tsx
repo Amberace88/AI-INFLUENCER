@@ -11,12 +11,12 @@ export function PersonaTabs({ id }: { id: string }) {
     { href: `/app/sheet?persona=${id}`, label: "Photos" },
   ];
   return (
-    <nav className="mt-5 flex gap-6 border-b border-line text-sm">
+    <nav aria-label="Persona sections" className="mt-6 flex gap-1 rounded-full bg-paper p-1 ring-1 ring-line sm:inline-flex">
       {tabs.map((t) => {
         const active = path === t.href;
         return (
           <Link key={t.href} href={t.href} aria-current={active ? "page" : undefined}
-            className={`-mb-px border-b-2 pb-2 ${active ? "border-ink font-semibold" : "border-transparent text-muted hover:text-ink"}`}>
+            className={`flex-1 rounded-full px-5 py-1.5 text-center text-sm transition-colors ${active ? "bg-ink font-semibold text-paper" : "text-muted hover:text-ink"}`}>
             {t.label}
           </Link>
         );

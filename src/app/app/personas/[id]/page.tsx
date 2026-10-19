@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/supabase/server";
-import { ROLES, SCORE_CRITERIA, workflowById, type Persona } from "@/lib/catalog";
-import { PersonaTabs } from "./tabs";
+import { SCORE_CRITERIA, workflowById, type Persona } from "@/lib/catalog";
 import { BENCHMARK_SCENES } from "@/lib/benchmark";
 import { PersonaForm } from "../persona-form";
 import { References } from "./references";
@@ -12,8 +11,8 @@ import { deletePersona } from "../../actions";
 export default async function PersonaPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<Record<string, string>> }) {
   const { id } = await params;
   const sp = await searchParams;
-  const { supabase } = await requireUser();
-  const { data: persona } = await supabase.from("personas").select("*").eq("id", id).maybeSingle();
+  const { supabase, user } = await requireUser();
+  const { data: persona } = await supabase.from("personas").select("*").eq("id", id).eq("owner_id", user.id).maybeSingle();
   if (!persona) notFound();
 
   const { data: refs } = await supabase
@@ -53,48 +52,50 @@ export default async function PersonaPage({ params, searchParams }: { params: Pr
     };
   };
 
-  return (
-    <div className="max-w-5xl space-y-14">
-      <div>
-        <Link href="/app/personas" className="text-sm text-muted hover:text-ink">Personas</Link>
-        <div className="mt-2 flex flex-wrap items-end justify-between gap-4">
-          <h1 className="text-5xl font-extrabold">{persona.name}</h1>
-          <Link href={`/app/studio?persona=${id}`} className="btn btn-primary">Shoot with {persona.name}</Link>
-        </div>
-        <p className="mt-2 text-muted">
-          {ROLES.find((r) => r.id === persona.role)?.label ?? "Influencer"}
-          {persona.brand_name ? ` for ${persona.brand_name}` : ""}
-          {persona.tagline ? `. ${persona.tagline}` : ""}
-        </p>
-        <PersonaTabs id={id} />
-        {sp.created === "twin" && (
-          <p role="status" className="mt-4 rounded-lg bg-paper p-3 text-sm ring-1 ring-ok/40">
-            Your digital twin is ready. Open the Studio and choose &ldquo;Same face, new scene&rdquo;: every shot uses your photos as the face reference.
-          </p>
-        )}
-        {persona.likeness === "self" && <p className="mt-2 inline-block rounded bg-ink px-2 py-0.5 text-xs font-semibold text-[#e6c86e]">Digital twin of you · consent on file</p>}
-        {sp.created === "ai" && (
-          <p role="status" className="mt-4 rounded-lg bg-paper p-3 text-sm ring-1 ring-ok/40">
-            {persona.name} is ready. Read the profile below and change anything that does not fit, then add a reference photo or shoot a first portrait.
-          </p>
-        )}
-      </div>
+  const notice =
+    sp.created === "twin"
+      ? "Your digital twin is ready. Open the Studio and choose “Same face, new scene”: every shot uses your photos as the face reference."
+      : sp.created === "ai"
+        ? `${persona.name} is ready. Read the profile and change anything that does not fit, then shoot a first portrait.`
+        : null;
+  const rules: [string, string | null][] = [["Always", persona.dos], ["Never", persona.donts]];
 
-      {(persona.bio || persona.voice) && (
-        <section className="grid gap-6 rounded-xl bg-paper p-6 ring-1 ring-line md:grid-cols-[1.4fr_1fr]">
+  return (
+    <div className="space-y-14">
+      {notice && <p role="status" className="panel-in rounded-xl bg-ok/10 p-4 text-sm text-ok ring-1 ring-ok/30">{notice}</p>}
+
+      {persona.bio || persona.voice ? (
+        <section aria-labelledby="words" className="grid gap-10 lg:grid-cols-[1.5fr_1fr]">
           <div>
-            <h2 className="text-sm text-muted">In their words</h2>
-            <p className="mt-2 text-xl leading-relaxed">{persona.bio}</p>
+            <h2 id="words" className="text-sm text-muted">In their own words</h2>
+            <blockquote className="mt-3 border-l-[3px] border-accent pl-5 text-[1.35rem] leading-relaxed text-ink">{persona.bio}</blockquote>
           </div>
-          <dl className="space-y-3 text-sm">
-            {persona.voice && (<div><dt className="text-muted">Voice</dt><dd>{persona.voice}</dd></div>)}
+          <dl className="space-y-5 text-sm">
+            {persona.voice && <div><dt className="text-xs text-muted">How they write</dt><dd className="mt-1 leading-relaxed">{persona.voice}</dd></div>}
             {!!persona.topics?.length && (
-              <div><dt className="text-muted">Talks about</dt>
-                <dd className="mt-1 flex flex-wrap gap-1">{persona.topics.map((t: string) => <span key={t} className="rounded-full bg-backdrop px-2 py-0.5">{t}</span>)}</dd>
+              <div>
+                <dt className="text-xs text-muted">Talks about</dt>
+                <dd className="mt-2 flex flex-wrap gap-1.5">{persona.topics.map((t: string) => <span key={t} className="rounded-full bg-paper px-2.5 py-1 ring-1 ring-line">{t}</span>)}</dd>
               </div>
             )}
-            {persona.audience && (<div><dt className="text-muted">Audience</dt><dd>{persona.audience}</dd></div>)}
+            {persona.audience && <div><dt className="text-xs text-muted">Who follows them</dt><dd className="mt-1 leading-relaxed">{persona.audience}</dd></div>}
           </dl>
+        </section>
+      ) : (
+        <section className="rounded-2xl border border-dashed border-line p-6">
+          <h2 className="text-xl font-bold">{persona.name} has no voice yet</h2>
+          <p className="mt-1 max-w-[60ch] text-sm text-muted">Fill in the bio and how they write under “Edit the passport”, so every post sounds like the same person.</p>
+        </section>
+      )}
+
+      {rules.some(([, v]) => v) && (
+        <section aria-label="House rules" className="grid gap-4 md:grid-cols-2">
+          {rules.filter(([, v]) => v).map(([k, v]) => (
+            <div key={k} className={`rounded-2xl p-5 ring-1 ${k === "Never" ? "bg-bad/[.04] ring-bad/20" : "bg-ok/[.05] ring-ok/20"}`}>
+              <h3 className={`text-sm font-semibold ${k === "Never" ? "text-bad" : "text-ok"}`}>{k}</h3>
+              <p className="mt-2 text-sm leading-relaxed">{v}</p>
+            </div>
+          ))}
         </section>
       )}
 
@@ -103,56 +104,67 @@ export default async function PersonaPage({ params, searchParams }: { params: Pr
         refs={(refs ?? []).map((r, i) => ({ id: r.id, isPrimary: r.is_primary, url: signed[i]?.signedUrl ?? "" }))}
       />
 
-      <section>
-        <h2 className="text-2xl font-bold">Consistency benchmark</h2>
-        <p className="mt-1 max-w-2xl text-sm text-muted">
-          Shoots {persona.name} in {BENCHMARK_SCENES.length} fixed scenes with fixed seeds, so you can compare workflows fairly.
-          Score each frame on the contact sheet; averages appear here.
-        </p>
-        <BenchmarkLauncher personaId={id} />
-        {!!runs?.length && (
-          <div className="mt-6 overflow-x-auto">
-            <table className="w-full min-w-[720px] text-sm">
-              <thead className="text-left text-muted">
-                <tr className="border-b border-line">
-                  <th className="py-2 pr-3 font-medium">Run</th>
-                  <th className="py-2 pr-3 font-medium">Frames</th>
-                  <th className="py-2 pr-3 font-medium">Accepted</th>
-                  {SCORE_CRITERIA.slice(0, 6).map((c) => <th key={c.key} className="py-2 pr-3 font-medium">{c.label}</th>)}
-                </tr>
-              </thead>
-              <tbody className="tabular-nums">
-                {runs.map((r) => {
-                  const s = summary(r.id);
-                  return (
-                    <tr key={r.id} className="border-b border-line/70">
-                      <td className="py-2 pr-3">
-                        <Link className="font-semibold hover:text-accent" href={`/app/sheet?run=${r.id}`}>
-                          {workflowById(r.workflow)?.label ?? r.workflow}
-                        </Link>
-                        <div className="text-xs text-muted">{new Date(r.created_at).toLocaleString()}</div>
-                      </td>
-                      <td className="py-2 pr-3">{s.done}/{s.total}{s.failed ? <span className="text-bad"> ({s.failed} failed)</span> : null}</td>
-                      <td className="py-2 pr-3">{s.accepted}</td>
-                      {SCORE_CRITERIA.slice(0, 6).map((c) => (
-                        <td key={c.key} className="py-2 pr-3">{s.avg[c.key] != null ? s.avg[c.key]!.toFixed(1) : "–"}</td>
-                      ))}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+      <details className="group rounded-2xl bg-paper ring-1 ring-line" open={!persona.bio || sp.created === "ai"}>
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-4 p-5 md:p-6 [&::-webkit-details-marker]:hidden">
+          <span>
+            <span className="block text-xl font-bold">Edit the passport</span>
+            <span className="text-sm text-muted">Name, character, appearance and photo style. Appearance is added to every photo prompt.</span>
+          </span>
+          <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-full ring-1 ring-line transition-transform group-open:rotate-45">+</span>
+        </summary>
+        <div className="border-t border-line p-5 md:p-6">
+          <PersonaForm persona={persona as Persona} />
+        </div>
+      </details>
 
-      <section>
-        <h2 className="mb-6 text-2xl font-bold">Profile</h2>
-        <PersonaForm persona={persona as Persona} />
-      </section>
+      <details className="group rounded-2xl ring-1 ring-line">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-4 p-5 md:p-6 [&::-webkit-details-marker]:hidden">
+          <span>
+            <span className="block text-xl font-bold">Consistency test</span>
+            <span className="text-sm text-muted">Shoot {persona.name} in {BENCHMARK_SCENES.length} fixed scenes to compare engines fairly.{runs?.length ? ` ${runs.length} run${runs.length === 1 ? "" : "s"} so far.` : ""}</span>
+          </span>
+          <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-full ring-1 ring-line transition-transform group-open:rotate-45">+</span>
+        </summary>
+        <div className="border-t border-line p-5 md:p-6">
+          <p className="max-w-[64ch] text-sm text-muted">Each run uses the same scenes and seeds. Score the frames on the contact sheet; the averages appear in this table.</p>
+          <BenchmarkLauncher personaId={id} />
+          {!!runs?.length && (
+            <div className="mt-6 overflow-x-auto">
+              <table className="w-full min-w-[720px] text-sm">
+                <thead className="text-left text-xs text-muted">
+                  <tr className="border-b border-line">
+                    <th className="py-2 pr-3 font-medium">Run</th>
+                    <th className="py-2 pr-3 font-medium">Frames</th>
+                    <th className="py-2 pr-3 font-medium">Kept</th>
+                    {SCORE_CRITERIA.slice(0, 6).map((c) => <th key={c.key} className="py-2 pr-3 font-medium">{c.label}</th>)}
+                  </tr>
+                </thead>
+                <tbody className="tabular-nums">
+                  {runs.map((r) => {
+                    const s = summary(r.id);
+                    return (
+                      <tr key={r.id} className="border-b border-line/70">
+                        <td className="py-2 pr-3">
+                          <Link className="font-semibold hover:text-accent" href={`/app/sheet?run=${r.id}`}>{workflowById(r.workflow)?.label ?? r.workflow}</Link>
+                          <div className="text-xs text-muted">{new Date(r.created_at).toLocaleString("en-GB")}</div>
+                        </td>
+                        <td className="py-2 pr-3">{s.done}/{s.total}{s.failed ? <span className="text-bad"> ({s.failed} failed)</span> : null}</td>
+                        <td className="py-2 pr-3">{s.accepted}</td>
+                        {SCORE_CRITERIA.slice(0, 6).map((c) => (
+                          <td key={c.key} className="py-2 pr-3">{s.avg[c.key] != null ? s.avg[c.key]!.toFixed(1) : "–"}</td>
+                        ))}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </details>
 
       <form action={deletePersona.bind(null, id)} className="border-t border-line pt-6">
-        <button className="text-sm text-bad hover:underline">Delete {persona.name} and all reference photos</button>
+        <button className="text-sm text-muted hover:text-bad hover:underline">Delete {persona.name} and all reference photos</button>
       </form>
     </div>
   );

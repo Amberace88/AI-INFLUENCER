@@ -1,9 +1,7 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/supabase/server";
 import { textAiConfigured } from "@/lib/ai/text";
 import { PLATFORMS } from "@/lib/ai/persona";
-import { PersonaTabs } from "../tabs";
 import { PostsBoard, type Post } from "./posts-board";
 
 export default async function PostsPage({ params }: { params: Promise<{ id: string }> }) {
@@ -17,10 +15,7 @@ export default async function PostsPage({ params }: { params: Promise<{ id: stri
   if (!persona) notFound();
 
   return (
-    <div className="max-w-5xl">
-      <Link href="/app/personas" className="text-sm text-muted hover:text-ink">Personas</Link>
-      <h1 className="mt-2 text-5xl font-extrabold">{persona.name}</h1>
-      <PersonaTabs id={id} />
+    <div>
       <PostsBoard
         personaId={id}
         personaName={persona.name}

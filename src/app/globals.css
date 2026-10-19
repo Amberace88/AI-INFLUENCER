@@ -11,6 +11,8 @@
   --ok: #1f7a52;
   --bad: #b3362b;
   --warn: #9a6a00;
+  --safelight: #e6c86e;  /* darkroom safelight: "lit" / active states only */
+  --console: #17202b;    /* studio console rail */
 }
 
 @theme inline {
@@ -23,6 +25,8 @@
   --color-ok: var(--ok);
   --color-bad: var(--bad);
   --color-warn: var(--warn);
+  --color-safelight: var(--safelight);
+  --color-console: var(--console);
   --font-sans: "Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif;
 }
 
@@ -141,3 +145,28 @@ details.faq[open] > div { animation: panel-in .3s ease both; }
   .marquee { animation: none; }
   .caret::after { animation: none; }
 }
+
+/* ---------- App shell ---------- */
+.condensed { font-variation-settings: "wdth" 78; letter-spacing: -0.02em; }
+.console { background: var(--console); color: #c9d2dc; }
+.console-link { color: #9eabb9; }
+.console-link:hover { color: #f8fafc; background: rgba(255,255,255,.06); }
+.console-link[aria-current="page"] { color: #f8fafc; background: rgba(255,255,255,.08); }
+.console-link[aria-current="page"]::before {
+  content: ""; position: absolute; left: -12px; top: 8px; bottom: 8px; width: 3px; border-radius: 0 3px 3px 0;
+  background: var(--safelight); box-shadow: 0 0 12px var(--safelight);
+}
+
+/* Persona passport */
+.mrz {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: .78rem; letter-spacing: .18em;
+  color: #6f7c8b; white-space: nowrap; overflow: hidden; text-overflow: clip;
+}
+.guilloche {
+  background-image:
+    repeating-radial-gradient(circle at 100% 0, transparent 0 14px, color-mix(in srgb, var(--accent) 7%, transparent) 14px 15px),
+    repeating-radial-gradient(circle at 0 100%, transparent 0 18px, color-mix(in srgb, var(--ink) 4%, transparent) 18px 19px);
+}
+
+/* Social post preview */
+.post-preview { box-shadow: 0 1px 0 var(--line), 0 18px 40px -28px rgba(23,32,43,.45); }
