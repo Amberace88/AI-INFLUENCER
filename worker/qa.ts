@@ -3,10 +3,11 @@ import { config } from "./config";
 
 /**
  * Automatic quality check of every generated image before the client sees it.
- * Uses Cloudflare Workers AI Llama 3.2 Vision (needs Meta's licence accepted once:
- * set CF_VISION_LICENSE_ACCEPTED=1 and the worker sends "agree" on start).
+ * Default: Mistral Small 3.1 (Apache 2.0, vision) on Cloudflare Workers AI through the
+ * OpenAI-compatible endpoint. NOTE: Llama 3.2 Vision is NOT used — its licence grants no
+ * rights for multimodal models to individuals/companies based in the EU.
  */
-const MODEL = "@cf/meta/llama-3.2-11b-vision-instruct";
+const MODEL = process.env.QA_MODEL || "@cf/mistralai/mistral-small-3.1-24b-instruct";
 
 export type QaResult = {
   verdict: "pass" | "fail" | "skipped";
@@ -17,25 +18,25 @@ export type QaResult = {
 };
 
 export function qaEnabled() {
-  return Boolean(config.cloudflare.accountId && config.cloudflare.token && process.env.CF_VISION_LICENSE_ACCEPTED === "1" && process.env.QA_DISABLED !== "1");
+  return Boolean(config.cloudflare.accountId && config.cloudflare.token && process.env.QA_DISABLED !== "1");
 }
 
-async function run(body: Record<string, unknown>) {
+async function ask(prompt: string, imageDataUri: string) {
   const { accountId, token, apiBase } = config.cloudflare;
-  const res = await fetch(`${apiBase}/accounts/${accountId}/ai/run/${MODEL}`, {
+  const res = await fetch(`${apiBase}/accounts/${accountId}/ai/v1/chat/completions`, {
     method: "POST",
     headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
-    body: JSON.stringify(body),
+    body: JSON.stringify({
+      model: MODEL,
+      max_tokens: 220,
+      temperature: 0,
+      messages: [{ role: "user", content: [{ type: "text", text: prompt }, { type: "image_url", image_url: { url: imageDataUri } }] }],
+    }),
     signal: AbortSignal.timeout(60_000),
   });
   const json = await res.json().catch(() => ({}));
-  if (!res.ok || json.success === false) throw new Error(`QA model HTTP ${res.status}: ${JSON.stringify(json?.errors ?? json).slice(0, 200)}`);
-  return json?.result?.response as string | undefined;
-}
-
-/** Sends the one-time licence acceptance (only when the owner opted in via env). */
-export async function acceptVisionLicence() {
-  try { await run({ prompt: "agree" }); } catch { /* already accepted or harmless */ }
+  if (!res.ok) throw new Error(`QA model HTTP ${res.status}: ${JSON.stringify(json?.errors ?? json?.error ?? json).slice(0, 200)}`);
+  return (json?.choices?.[0]?.message?.content as string | undefined) ?? "";
 }
 
 const PROMPT = `You are a strict quality inspector for AI-generated advertising photos.
@@ -69,11 +70,6 @@ export function judge(raw: string): QaResult {
 
 export async function inspect(image: Buffer): Promise<QaResult> {
   const small = await sharp(image).resize(768, 768, { fit: "inside" }).jpeg({ quality: 85 }).toBuffer();
-  const raw = await run({
-    messages: [{ role: "user", content: PROMPT }],
-    image: `data:image/jpeg;base64,${small.toString("base64")}`,
-    max_tokens: 200,
-    temperature: 0,
-  });
-  return judge(raw ?? "");
+  const raw = await ask(PROMPT, `data:image/jpeg;base64,${small.toString("base64")}`);
+  return judge(raw);
 }

@@ -11,7 +11,7 @@ import { comfyuiProvider } from "./providers/comfyui";
 import { falProvider } from "./providers/fal";
 import { cloudflareProvider } from "./providers/cloudflare";
 import { Job, PermanentError, Provider, ProviderResult, ReferenceImage } from "./types";
-import { acceptVisionLicence, inspect, qaEnabled, type QaResult } from "./qa";
+import { inspect, qaEnabled, type QaResult } from "./qa";
 
 const all: Record<string, Provider> = { comfyui: comfyuiProvider, fal: falProvider, cloudflare: cloudflareProvider };
 const providers = config.providers.map((n) => {
@@ -154,9 +154,17 @@ process.on("SIGINT", () => { if (stopping) process.exit(1); stopping = true; log
 process.on("SIGTERM", () => { stopping = true; });
 
 async function main() {
-  if (process.env.CF_VISION_LICENSE_ACCEPTED === "1") await acceptVisionLicence();
   const ok = await check();
-  log(qaEnabled() ? "✓ quality check on (Llama 3.2 Vision)" : "! quality check off: set CF_VISION_LICENSE_ACCEPTED=1 to enable");
+  if (qaEnabled()) {
+    try {
+      const sharp = (await import("sharp")).default;
+      const probe = await sharp({ create: { width: 64, height: 64, channels: 3, background: "#999" } }).jpeg().toBuffer();
+      const r = await inspect(probe);
+      log(`✓ quality check on (${process.env.QA_MODEL || "Mistral Small 3.1 vision"}) — probe: ${r.verdict}`);
+    } catch (e) {
+      log(`✗ quality check unavailable: ${(e as Error).message} — images will not be inspected`);
+    }
+  } else log("! quality check off");
   if (process.argv.includes("--check")) process.exit(ok ? 0 : 1);
   log("waiting for jobs…");
   while (!stopping) {
